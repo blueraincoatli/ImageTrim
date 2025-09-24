@@ -88,6 +88,14 @@ class ModernApp:
         
         self.style.configure('Secondary.TFrame',
                            background='#2B2B2B')  # 深灰色用于中右栏和主窗口
+                           
+        # 配置信息框架样式
+        self.style.configure('Info.TFrame',
+                           background='#3B5998')  # 蓝色用于未选中的功能卡片
+                           
+        # 配置成功框架样式
+        self.style.configure('Success.TFrame',
+                           background='#28a745')  # 绿色用于选中的功能卡片
         
         # 配置标签框架样式
         self.style.configure('Info.TLabelframe',
@@ -251,11 +259,10 @@ class ModernApp:
             # 使用Frame作为卡片，支持点击选择
             card = ttkb.Frame(
                 self.function_buttons_frame,
-                style='info',
+                bootstyle='info',  # 使用bootstyle而不是style
                 padding=15
             )
-            card.pack(fill=X, pady=5, padx=5)
-            card.pack_propagate(False)
+            card.pack(fill=X, pady=5, padx=5, ipady=10)
             
             # 卡片内容
             title_label = ttkb.Label(
