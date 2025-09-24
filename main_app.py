@@ -31,11 +31,9 @@ class ModernApp:
         self.root.geometry("1400x800")
         self.root.minsize(1200, 700)
 
-        # 1. 设置主题和颜色
-        self.style = ttkb.Style(theme='superhero')
-        self.colors = self.style.colors
-        self.root.configure(bg=self.colors.get('bg'))
-
+        # 1. 设置自定义主题和颜色
+        self.setup_custom_theme()
+        
         # 2. 初始化功能管理器
         self.function_manager = self.setup_function_manager()
 
@@ -50,6 +48,115 @@ class ModernApp:
             first_module_name = self.function_manager.get_module_names()[0]
             self.function_manager.activate_module(first_module_name)
             self.update_ui_for_module(self.function_manager.get_module(first_module_name))
+
+    def setup_custom_theme(self):
+        """设置自定义主题"""
+        # 使用darkly主题作为基础
+        self.style = ttkb.Style(theme='darkly')
+        
+        # 自定义颜色配置
+        self.style.configure('.', font=('Arial', 14))  # 设置默认字体大小为14px
+        
+        # 配置按钮样式为橙色
+        self.style.configure('Primary.TButton', 
+                           background='#FF8C00',  # 橙色
+                           foreground='white',
+                           bordercolor='#FF8C00',
+                           font=('Arial', 14))
+        
+        self.style.configure('Success.TButton',
+                           background='#FFA500',  # 橙色
+                           foreground='white',
+                           bordercolor='#FFA500',
+                           font=('Arial', 14))
+        
+        self.style.configure('Danger.TButton',
+                           background='#FF4500',  # 深橙色
+                           foreground='white',
+                           bordercolor='#FF4500',
+                           font=('Arial', 14))
+        
+        self.style.configure('Warning.TButton',
+                           background='#FFA07A',  # 浅橙色
+                           foreground='white',
+                           bordercolor='#FFA07A',
+                           font=('Arial', 14))
+        
+        # 配置框架样式
+        self.style.configure('Primary.TFrame',
+                           background='#2B2B2B')  # 深灰色
+        
+        self.style.configure('Secondary.TFrame',
+                           background='#3B3B3B')  # 稍浅的深灰色
+        
+        # 配置标签框架样式
+        self.style.configure('Info.TLabelframe',
+                           background='#2B2B2B',
+                           foreground='#FF8C00',  # 橙色文字
+                           font=('Arial', 14))
+        
+        self.style.configure('TLabelframe.Label',
+                           background='#2B2B2B',
+                           foreground='#FF8C00',  # 橙色文字
+                           font=('Arial', 14))
+        
+        # 配置标签样式
+        self.style.configure('TLabel',
+                           background='#2B2B2B',
+                           foreground='#FFFFFF',  # 白色文字
+                           font=('Arial', 14))
+        
+        # 配置输入框样式
+        self.style.configure('TEntry',
+                           fieldbackground='#4B4B4B',  # 深灰色输入框
+                           foreground='#FFFFFF',       # 白色文字
+                           font=('Arial', 14))
+        
+        # 配置滚动条样式
+        self.style.configure('TScrollbar',
+                           background='#FF8C00',       # 橙色滚动条
+                           troughcolor='#2B2B2B',      # 深灰色滑槽
+                           bordercolor='#2B2B2B')
+        
+        # 配置进度条样式
+        self.style.configure('TProgressbar',
+                           background='#FF8C00',       # 橙色进度条
+                           troughcolor='#4B4B4B',      # 深灰色滑槽
+                           bordercolor='#2B2B2B')
+        
+        # 设置主窗口背景色
+        self.root.configure(bg='#2B2B2B')
+        
+    def setup_rounded_styles(self):
+        """设置改进的样式"""
+        # 配置按钮样式以获得更好的外观
+        self.style.configure('Primary.TButton', 
+                           borderwidth=1,
+                           relief='flat',
+                           padding=(10, 5))
+        
+        # 配置框架样式
+        self.style.configure('Primary.TFrame',
+                           borderwidth=1,
+                           relief='flat')
+        
+        # 配置标签框架样式
+        self.style.configure('Info.TLabelframe',
+                           borderwidth=1,
+                           relief='flat',
+                           padding=10)
+        
+        # 配置成功按钮样式
+        self.style.configure('Success.TButton',
+                           borderwidth=1,
+                           relief='flat',
+                           padding=(10, 5))
+        
+        # 配置危险按钮样式
+        self.style.configure('Danger.TButton',
+                           borderwidth=1,
+                           relief='flat',
+                           padding=(10, 5))
 
 
     def setup_function_manager(self):
@@ -154,7 +261,7 @@ class ModernApp:
             btn = ttkb.Button(
                 card,
                 text="选择",
-                bootstyle='outline-info',
+                bootstyle='success',  # 改为实心按钮
                 command=lambda m=module: self.switch_module(m)
             )
             btn.pack(anchor=E)
@@ -163,6 +270,11 @@ class ModernApp:
 
     def switch_module(self, module: BaseFunctionModule):
         """切换功能模块"""
+        # 先停用当前模块
+        if self.function_manager.active_module:
+            self.function_manager.active_module.on_deactivate()
+            
+        # 激活新模块
         self.function_manager.activate_module(module.name)
         self.update_ui_for_module(module)
 

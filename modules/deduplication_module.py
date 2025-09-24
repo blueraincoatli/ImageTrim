@@ -3,6 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 import os
 import threading
 from typing import Dict, Any
+from datetime import datetime
 
 try:
     import ttkbootstrap as ttkb
@@ -35,16 +36,26 @@ class DeduplicationModule(BaseFunctionModule):
         self.settings_root = parent
         settings_frame = ttkb.Frame(parent, padding=10)
 
-        # 1. 扫描路径
-        path_frame = ttkb.Labelframe(settings_frame, text="扫描路径", padding=10)
-        path_frame.pack(fill=X, pady=5, expand=True)
+        # 1. 扫描路径（支持多个路径）
+        paths_frame = ttkb.Labelframe(settings_frame, text="扫描路径", padding=10)
+        paths_frame.pack(fill=BOTH, pady=5, expand=True)
 
-        self.path_var = tk.StringVar(value="")
-        path_entry = ttkb.Entry(path_frame, textvariable=self.path_var)
-        path_entry.pack(side=LEFT, fill=X, expand=True, padx=(0, 5))
-
-        browse_btn = ttkb.Button(path_frame, text="浏览", command=self.browse_folder, bootstyle='outline-secondary')
-        browse_btn.pack(side=LEFT)
+        # 路径列表显示区域
+        self.paths_listbox = tk.Listbox(paths_frame, height=4, relief='flat', highlightthickness=0)
+        self.paths_listbox.pack(fill=X, pady=(0, 5))
+        
+        # 路径操作按钮（使用圆角样式）
+        path_btn_frame = ttkb.Frame(paths_frame)
+        path_btn_frame.pack(fill=X)
+        
+        add_path_btn = ttkb.Button(path_btn_frame, text="添加路径", command=self.add_folder, bootstyle='success', width=10)
+        add_path_btn.pack(side=LEFT, padx=(0, 5))
+        
+        remove_path_btn = ttkb.Button(path_btn_frame, text="移除路径", command=self.remove_folder, bootstyle='danger', width=10)
+        remove_path_btn.pack(side=LEFT, padx=5)
+        
+        clear_paths_btn = ttkb.Button(path_btn_frame, text="清空路径", command=self.clear_folders, bootstyle='warning', width=10)
+        clear_paths_btn.pack(side=LEFT, padx=5)
 
         # 2. 检测设置
         options_frame = ttkb.Labelframe(settings_frame, text="检测设置", padding=10)
@@ -71,7 +82,7 @@ class DeduplicationModule(BaseFunctionModule):
         self.start_btn = ttkb.Button(action_frame, text="▶️ 开始扫描", command=self.start_scan, bootstyle='success')
         self.start_btn.pack(side=LEFT, fill=X, expand=True, padx=(0, 5))
 
-        self.stop_btn = ttkb.Button(action_frame, text="⏹️ 停止", command=self.stop_execution, bootstyle='danger-outline', state=DISABLED)
+        self.stop_btn = ttkb.Button(action_frame, text="⏹️ 停止", command=self.stop_execution, bootstyle='danger', state=DISABLED)
         self.stop_btn.pack(side=LEFT, fill=X, expand=True, padx=5)
         
         return settings_frame
@@ -81,11 +92,30 @@ class DeduplicationModule(BaseFunctionModule):
         self.workspace_root = parent
         workspace_frame = ttkb.Frame(parent, padding=10)
         
-        stats_frame = ttkb.Frame(workspace_frame)
-        stats_frame.pack(fill=X, pady=5)
-        self.stats_label = ttkb.Label(stats_frame, text="尚未开始扫描。", font=("", 10))
+        # 进度区域
+        progress_frame = ttkb.Frame(workspace_frame)
+        progress_frame.pack(fill=X, pady=5)
+        self.stats_label = ttkb.Label(progress_frame, text="尚未开始扫描。", font=("", 10))
         self.stats_label.pack(anchor=W)
-
+        
+        self.progress_bar = ttkb.Progressbar(progress_frame, bootstyle='info-striped')
+        self.progress_bar.pack(fill=X, pady=5)
+        
+        # 日志区域
+        log_frame = ttkb.Labelframe(workspace_frame, text="扫描日志", padding=5)
+        log_frame.pack(fill=BOTH, expand=True, pady=10)
+        
+        self.log_text = tk.Text(log_frame, height=8, state='disabled')
+        log_scrollbar = ttkb.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=log_scrollbar.set)
+        
+        self.log_text.pack(side="left", fill="both", expand=True)
+        log_scrollbar.pack(side="right", fill="y")
+        
+        # 结果区域
+        result_label = ttkb.Label(workspace_frame, text="扫描结果", font=("", 12, "bold"), bootstyle='primary')
+        result_label.pack(anchor=W, pady=(10, 5))
+        
         result_container = ttkb.Frame(workspace_frame)
         result_container.pack(fill=BOTH, expand=True, pady=10)
 
@@ -110,21 +140,45 @@ class DeduplicationModule(BaseFunctionModule):
         self.initial_prompt = ttkb.Label(self.scrollable_frame, text="扫描结果将在这里显示...", font=("", 12, 'italic'))
         self.initial_prompt.pack(pady=50)
 
+        # 设置回调函数
+        self.set_callbacks(self.update_progress, self.add_log_message)
+        
         return workspace_frame
 
     def browse_folder(self):
         path = filedialog.askdirectory()
         if path:
             self.path_var.set(path)
+            
+    def add_folder(self):
+        path = filedialog.askdirectory()
+        if path and path not in self.paths_listbox.get(0, tk.END):
+            self.paths_listbox.insert(tk.END, path)
+            
+    def remove_folder(self):
+        selection = self.paths_listbox.curselection()
+        if selection:
+            self.paths_listbox.delete(selection[0])
+            
+    def clear_folders(self):
+        self.paths_listbox.delete(0, tk.END)
 
     def start_scan(self):
-        scan_path = self.path_var.get()
-        if not scan_path or not os.path.isdir(scan_path):
-            messagebox.showerror("路径无效", "请输入一个有效的文件夹路径。")
+        # 获取所有扫描路径
+        paths = list(self.paths_listbox.get(0, tk.END))
+        
+        if not paths:
+            messagebox.showerror("路径无效", "请至少添加一个有效的文件夹路径。")
             return
+            
+        # 验证所有路径都有效
+        for path in paths:
+            if not os.path.isdir(path):
+                messagebox.showerror("路径无效", f"路径不存在或无效: {path}")
+                return
 
         params = {
-            'path': scan_path,
+            'paths': paths,
             'sensitivity': self.sensitivity_var.get(),
             'subdirs': self.subdirs_var.get()
         }
@@ -148,38 +202,64 @@ class DeduplicationModule(BaseFunctionModule):
             import imagehash
             from collections import defaultdict
 
-            scan_path = params['path']
+            scan_paths = params['paths']
             threshold = 100 - params['sensitivity']
             scan_subdirs = params['subdirs']
 
+            # 收集所有图片文件
             image_files = []
             valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp')
-            if scan_subdirs:
-                for root, _, files in os.walk(scan_path):
-                    if not self.is_running: break
-                    for file in files:
+            
+            total_paths = len(scan_paths)
+            for path_idx, scan_path in enumerate(scan_paths):
+                if not self.is_running: break
+                
+                # 更新进度信息
+                if self.log_callback:
+                    self.log_callback(f"正在扫描路径 ({path_idx+1}/{total_paths}): {scan_path}", "info")
+                
+                if scan_subdirs:
+                    for root, _, files in os.walk(scan_path):
+                        if not self.is_running: break
+                        for file in files:
+                            if file.lower().endswith(valid_extensions):
+                                image_files.append(os.path.join(root, file))
+                else:
+                    for file in os.listdir(scan_path):
+                        if not self.is_running: break
                         if file.lower().endswith(valid_extensions):
-                            image_files.append(os.path.join(root, file))
-            else:
-                for file in os.listdir(scan_path):
-                    if not self.is_running: break
-                    if file.lower().endswith(valid_extensions):
-                        image_files.append(os.path.join(scan_path, file))
+                            image_files.append(os.path.join(scan_path, file))
             
             if not self.is_running: return
 
+            # 计算哈希值
             hashes = {}
             total_files = len(image_files)
+            
+            if self.log_callback:
+                self.log_callback(f"找到 {total_files} 个图片文件，开始计算哈希值...", "info")
+            
             for i, f in enumerate(image_files):
                 if not self.is_running: break
+                
+                # 更新进度
+                if self.progress_callback:
+                    progress = (i + 1) / total_files * 100
+                    self.progress_callback(progress, f"计算哈希值: {i+1}/{total_files}")
+                
                 try:
                     with Image.open(f) as img:
                         hashes[f] = imagehash.phash(img)
                 except Exception as e:
-                    pass
+                    if self.log_callback:
+                        self.log_callback(f"无法处理图片 {f}: {str(e)}", "warning")
             
             if not self.is_running: return
 
+            # 查找重复项
+            if self.log_callback:
+                self.log_callback("正在查找重复图片...", "info")
+                
             duplicates = defaultdict(list)
             files_to_check = list(hashes.keys())
             
@@ -204,13 +284,40 @@ class DeduplicationModule(BaseFunctionModule):
             self.workspace_root.after(0, lambda: self.display_results(duplicates))
 
         except Exception as e:
+            if self.log_callback:
+                self.log_callback(f"执行过程中出错: {str(e)}", "error")
             print(f"Error during execution: {e}")
         finally:
             self.is_running = False
             if self.settings_root:
                 self.settings_root.after(0, lambda: self.start_btn.config(state=NORMAL))
                 self.settings_root.after(0, lambda: self.stop_btn.config(state=DISABLED))
+                
+            # 完成消息
+            if self.log_callback:
+                self.log_callback("扫描完成", "info")
 
+    def update_progress(self, value: float, message: str = ""):
+        """更新进度条和状态信息"""
+        if self.workspace_root:
+            self.workspace_root.after(0, lambda: self.progress_bar.config(value=value))
+            if message:
+                self.workspace_root.after(0, lambda: self.stats_label.config(text=message))
+                
+    def add_log_message(self, message: str, level: str = "info"):
+        """添加日志消息"""
+        if self.workspace_root:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            formatted_message = f"[{timestamp}] [{level.upper()}] {message}\n"
+            self.workspace_root.after(0, lambda: self._append_log(formatted_message))
+            
+    def _append_log(self, message: str):
+        """在日志区域追加消息"""
+        self.log_text.config(state='normal')
+        self.log_text.insert(tk.END, message)
+        self.log_text.see(tk.END)
+        self.log_text.config(state='disabled')
+        
     def display_results(self, duplicates: Dict):
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
@@ -229,6 +336,23 @@ class DeduplicationModule(BaseFunctionModule):
             group_counter += 1
             group_frame = ttkb.Labelframe(self.scrollable_frame, text=f"重复组 {group_counter} ({len(dups)} 张图片)", padding=10, bootstyle='info')
             group_frame.pack(fill=X, expand=True, padx=10, pady=10)
+            
+            # 添加操作按钮
+            action_frame = ttkb.Frame(group_frame)
+            action_frame.pack(fill=X, pady=(0, 10))
+            
+            ttkb.Label(action_frame, text="选择操作:", width=10).pack(side=LEFT)
+            
+            # 为每组创建一个变量来跟踪选择
+            selected_files = []
+            
+            delete_btn = ttkb.Button(action_frame, text="删除选中", bootstyle='danger', 
+                                   command=lambda dups=dups: self.delete_selected_files(dups))
+            delete_btn.pack(side=LEFT, padx=5)
+            
+            move_btn = ttkb.Button(action_frame, text="移动选中", bootstyle='warning',
+                                 command=lambda dups=dups: self.move_selected_files(dups))
+            move_btn.pack(side=LEFT, padx=5)
 
             canvas = tk.Canvas(group_frame)
             scrollbar = ttk.Scrollbar(group_frame, orient="horizontal", command=canvas.xview)
@@ -256,5 +380,65 @@ class DeduplicationModule(BaseFunctionModule):
 
                     filename_label = ttk.Label(img_frame, text=os.path.basename(f_path), wraplength=150)
                     filename_label.pack()
+                    
+                    # 文件大小信息
+                    try:
+                        file_size = os.path.getsize(f_path)
+                        size_label = ttk.Label(img_frame, text=f"{file_size/1024/1024:.2f} MB", font=("", 8))
+                        size_label.pack()
+                    except:
+                        pass
+                        
                 except Exception as e:
                     print(f"Could not display image {f_path}: {e}")
+                    
+    def delete_selected_files(self, file_paths):
+        """删除选中的文件"""
+        if not file_paths:
+            return
+            
+        result = messagebox.askyesno("确认删除", f"确定要删除这 {len(file_paths)} 个文件吗？此操作不可撤销！")
+        if result:
+            deleted_count = 0
+            for file_path in file_paths:
+                try:
+                    os.remove(file_path)
+                    deleted_count += 1
+                    self.add_log_message(f"已删除文件: {file_path}", "info")
+                except Exception as e:
+                    self.add_log_message(f"删除文件失败 {file_path}: {str(e)}", "error")
+                    
+            self.add_log_message(f"删除完成，成功删除 {deleted_count}/{len(file_paths)} 个文件", "info")
+            messagebox.showinfo("删除完成", f"成功删除 {deleted_count} 个文件")
+            
+    def move_selected_files(self, file_paths):
+        """移动选中的文件"""
+        if not file_paths:
+            return
+            
+        target_dir = filedialog.askdirectory(title="选择目标文件夹")
+        if not target_dir:
+            return
+            
+        moved_count = 0
+        for file_path in file_paths:
+            try:
+                filename = os.path.basename(file_path)
+                target_path = os.path.join(target_dir, filename)
+                
+                # 处理重名文件
+                counter = 1
+                base_name, ext = os.path.splitext(filename)
+                while os.path.exists(target_path):
+                    new_name = f"{base_name}_{counter}{ext}"
+                    target_path = os.path.join(target_dir, new_name)
+                    counter += 1
+                    
+                os.rename(file_path, target_path)
+                moved_count += 1
+                self.add_log_message(f"已移动文件: {file_path} -> {target_path}", "info")
+            except Exception as e:
+                self.add_log_message(f"移动文件失败 {file_path}: {str(e)}", "error")
+                
+        self.add_log_message(f"移动完成，成功移动 {moved_count}/{len(file_paths)} 个文件", "info")
+        messagebox.showinfo("移动完成", f"成功移动 {moved_count} 个文件")
