@@ -84,10 +84,10 @@ class ModernApp:
         
         # 配置框架样式
         self.style.configure('Primary.TFrame',
-                           background='#2B2B2B')  # 深灰色
+                           background='#1B1B1B')  # 更深的灰色用于左栏
         
         self.style.configure('Secondary.TFrame',
-                           background='#3B3B3B')  # 稍浅的深灰色
+                           background='#2B2B2B')  # 深灰色用于右栏
         
         # 配置标签框架样式
         self.style.configure('Info.TLabelframe',
@@ -224,7 +224,7 @@ class ModernApp:
         """初始化左栏内容"""
         ttkb.Label(self.left_frame, text="🔧 功能选择", font=("", 16, "bold"), bootstyle='inverse-primary').pack(pady=20)
         self.function_buttons_frame = ttkb.Frame(self.left_frame, style='primary.TFrame')
-        self.function_buttons_frame.pack(fill=X, padx=10)
+        self.function_buttons_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
     def init_center_panel(self):
         """初始化中栏内容"""
@@ -246,27 +246,38 @@ class ModernApp:
         for name in self.function_manager.get_module_names():
             module = self.function_manager.get_module(name)
             
-            # 使用Labelframe作为卡片
-            card = ttkb.Labelframe(
+            # 使用Frame作为卡片，支持点击选择
+            card = ttkb.Frame(
                 self.function_buttons_frame,
-                text=f"{module.icon} {module.display_name}",
-                bootstyle='info',
-                padding=10
+                style='info',
+                padding=15
             )
             card.pack(fill=X, pady=5)
+            card.pack_propagate(False)
             
-            desc = ttkb.Label(card, text=module.description, wraplength=220, bootstyle='inverse-info')
-            desc.pack(fill=X, pady=(0, 10))
-
-            btn = ttkb.Button(
-                card,
-                text="选择",
-                bootstyle='success',  # 改为实心按钮
-                command=lambda m=module: self.switch_module(m)
+            # 卡片内容
+            title_label = ttkb.Label(
+                card, 
+                text=f"{module.icon} {module.display_name}", 
+                font=("", 14, "bold"),
+                bootstyle='inverse-info'
             )
-            btn.pack(anchor=E)
+            title_label.pack(anchor=W)
             
-            self.module_buttons[name] = {'card': card, 'button': btn}
+            desc_label = ttkb.Label(
+                card, 
+                text=module.description, 
+                wraplength=220, 
+                bootstyle='inverse-info'
+            )
+            desc_label.pack(fill=X, pady=(5, 0))
+            
+            # 绑定点击事件
+            card.bind("<Button-1>", lambda e, m=module: self.switch_module(m))
+            title_label.bind("<Button-1>", lambda e, m=module: self.switch_module(m))
+            desc_label.bind("<Button-1>", lambda e, m=module: self.switch_module(m))
+            
+            self.module_buttons[name] = {'card': card, 'title': title_label, 'desc': desc_label}
 
     def switch_module(self, module: BaseFunctionModule):
         """切换功能模块"""
@@ -283,11 +294,15 @@ class ModernApp:
         # 更新高亮状态
         for name, widgets in self.module_buttons.items():
             if name == module.name:
-                widgets['card'].config(bootstyle='success') # 高亮选中的卡片
-                widgets['button'].config(bootstyle='success')
+                # 选中的卡片使用成功样式
+                widgets['card'].config(bootstyle='success')
+                widgets['title'].config(bootstyle='inverse-success')
+                widgets['desc'].config(bootstyle='inverse-success')
             else:
+                # 未选中的卡片使用信息样式
                 widgets['card'].config(bootstyle='info')
-                widgets['button'].config(bootstyle='outline-info')
+                widgets['title'].config(bootstyle='inverse-info')
+                widgets['desc'].config(bootstyle='inverse-info')
 
         # 清空现有UI
         for widget in self.settings_container.winfo_children():
