@@ -87,7 +87,7 @@ class ModernApp:
                            background='#1B1B1B')  # 更深的灰色用于左栏
         
         self.style.configure('Secondary.TFrame',
-                           background='#2B2B2B')  # 深灰色用于右栏
+                           background='#2B2B2B')  # 深灰色用于中右栏和主窗口
         
         # 配置标签框架样式
         self.style.configure('Info.TLabelframe',
@@ -102,7 +102,7 @@ class ModernApp:
         
         # 配置标签样式
         self.style.configure('TLabel',
-                           background='#2B2B2B',
+                           background='#1B1B1B',  # 左栏背景色
                            foreground='#FFFFFF',  # 白色文字
                            font=('Arial', 14))
         
@@ -222,8 +222,10 @@ class ModernApp:
 
     def init_left_panel(self):
         """初始化左栏内容"""
+        # 设置左栏背景为更深的灰色
+        self.left_frame.configure(style='Primary.TFrame')
         ttkb.Label(self.left_frame, text="🔧 功能选择", font=("", 16, "bold"), bootstyle='inverse-primary').pack(pady=20)
-        self.function_buttons_frame = ttkb.Frame(self.left_frame, style='primary.TFrame')
+        self.function_buttons_frame = ttkb.Frame(self.left_frame, style='Primary.TFrame')
         self.function_buttons_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
     def init_center_panel(self):
@@ -252,7 +254,7 @@ class ModernApp:
                 style='info',
                 padding=15
             )
-            card.pack(fill=X, pady=5)
+            card.pack(fill=X, pady=5, padx=5)
             card.pack_propagate(False)
             
             # 卡片内容
