@@ -1,4 +1,3 @@
-
 import tkinter as tk
 from tkinter import ttk
 import os
@@ -17,18 +16,20 @@ except ImportError:
 
 # 假设 function_modules.py 在同一目录下
 from function_modules import BaseFunctionModule, FunctionManager
+from improved_deduplication_module import ImprovedDeduplicationModule
 
-class ModernApp:
+
+class ImprovedModernApp:
     """
-    现代化图片处理工具套件主程序
+    改进版现代化图片处理工具套件主程序
     - 采用 ttkbootstrap 实现现代UI
-    - 使用 PanedWindow 实现可拖拽的三栏布局
+    - 采用左右布局，左侧分为功能选择和设置区，右侧为操作区
     - 插件化架构，动态加载功能模块
     """
     def __init__(self, root):
         self.root = root
-        self.root.title("图片处理工具套件 - v2.0")
-        self.root.geometry("1400x800")
+        self.root.title("图片处理工具套件 - 改进版 v3.0")
+        self.root.geometry("1400x900")
         self.root.minsize(1200, 700)
 
         # 1. 设置自定义主题和颜色
@@ -37,7 +38,7 @@ class ModernApp:
         # 2. 初始化功能管理器
         self.function_manager = self.setup_function_manager()
 
-        # 3. 创建主布局
+        # 3. 创建主布局 (左右布局，左栏分上下两部分)
         self.create_main_layout()
 
         # 4. 加载并显示功能模块
@@ -79,16 +80,17 @@ class ModernApp:
         self.style.configure('Warning.TButton',
                            background='#FFA07A',  # 浅橙色
                            foreground='white',
-                           bordercolor='#FFA07A',
+                           bordercolor='#FFA500',
                            font=('Arial', 14))
         
         # 配置框架样式
         self.style.configure('Primary.TFrame',
                            background='#1B1B1B')  # 更深的灰色用于左栏
-        
+
         self.style.configure('Secondary.TFrame',
-                           background='#2B2B2B')  # 深灰色用于中右栏和主窗口
+                           background='#2B2B2B')  # 深灰色用于右栏
                            
+        
         # 配置信息框架样式（未选中的功能卡片）
         self.style.configure('Info.TFrame',
                            background='#353535')  # 浅灰色用于未选中的功能卡片
@@ -135,7 +137,7 @@ class ModernApp:
         # 配置进度条样式
         self.style.configure('TProgressbar',
                            background='#FF8C00',       # 橙色进度条
-                           troughcolor='#4B4B4B',      # 深灰色滑槽
+                           troughcolor='#4B2B2B',      # 深灰色滑槽
                            bordercolor='#2B2B2B')
         
         # 设置主窗口背景色
@@ -174,86 +176,86 @@ class ModernApp:
 
 
     def setup_function_manager(self):
+        print(f"--- Diagnosing importlib in setup_function_manager ---")
+        try:
+            print(f"  importlib file: {importlib.__file__}")
+        except AttributeError:
+            print("  importlib is a built-in module and has no __file__ attribute.")
+        print(f"  sys.path: {sys.path}")
+        print(f"-----------------------------------------------------")
+        
         manager = FunctionManager()
+        
+        # 注册改进版的去重模块
+        improved_dedup_module = ImprovedDeduplicationModule()
+        manager.register_module(improved_dedup_module)
+        
+        # 如果modules目录存在，也加载其中的模块
         modules_dir = 'modules'
-        if not os.path.exists(modules_dir):
-            print(f"警告: 功能模块目录 '{modules_dir}' 不存在。")
-            return manager
-
-        for filename in os.listdir(modules_dir):
-            if filename.endswith('_module.py'):
-                module_name = filename[:-3]
-                try:
-                    # 检查importlib.util是否可用
-                    if hasattr(importlib, 'util'):
+        if os.path.exists(modules_dir):
+            for filename in os.listdir(modules_dir):
+                if filename.endswith('_module.py') and filename != 'deduplication_module.py':
+                    module_name = filename[:-3]
+                    try:
                         module_spec = importlib.util.spec_from_file_location(module_name, os.path.join(modules_dir, filename))
                         imported_module = importlib.util.module_from_spec(module_spec)
                         module_spec.loader.exec_module(imported_module)
-                    else:
-                        # 备用方法：直接导入模块
-                        import sys
-                        sys.path.insert(0, modules_dir)
-                        imported_module = __import__(module_name)
-                        sys.path.pop(0)
 
-                    for name, cls in inspect.getmembers(imported_module, inspect.isclass):
-                        if issubclass(cls, BaseFunctionModule) and cls is not BaseFunctionModule:
-                            instance = cls()
-                            manager.register_module(instance)
-                            print(f"[OK] 成功加载模块: {instance.display_name}")
-                except Exception as e:
-                    print(f"[ERROR] Failed to load module {module_name}: {e}")
-                    traceback.print_exc()
+                        for name, cls in inspect.getmembers(imported_module, inspect.isclass):
+                            if issubclass(cls, BaseFunctionModule) and cls is not BaseFunctionModule:
+                                instance = cls()
+                                manager.register_module(instance)
+                                print(f"[OK] 成功加载模块: {instance.display_name}")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to load module {module_name}: {e}")
+                        traceback.print_exc()
         return manager
 
     def create_main_layout(self):
-        """创建可拖拽的三栏式布局"""
-        # 主 PanedWindow
+        """创建左右布局，左栏分为上下两部分"""
+        # 主水平PanedWindow，用于分隔左侧功能区和右侧操作区
         self.main_paned_window = ttkb.PanedWindow(self.root, orient=HORIZONTAL)
         self.main_paned_window.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-        # 左栏 (功能选择)
-        self.left_frame = ttkb.Frame(self.main_paned_window, width=280, style='primary.TFrame')
-        self.main_paned_window.add(self.left_frame, weight=20)
-        self.left_frame.pack_propagate(False)
+        # 左侧框架（功能选择 + 设置控制）
+        self.left_frame = ttkb.Frame(self.main_paned_window, style='primary.TFrame')
+        self.main_paned_window.add(self.left_frame, weight=30)
 
-        # 中栏和右栏的 PanedWindow
-        self.center_right_paned = ttkb.PanedWindow(self.main_paned_window, orient=HORIZONTAL)
-        self.main_paned_window.add(self.center_right_paned, weight=80)
+        # 左侧垂直PanedWindow，用于分隔功能选择和设置
+        self.left_paned_window = ttkb.PanedWindow(self.left_frame, orient=VERTICAL)
+        self.left_paned_window.pack(fill=BOTH, expand=True)
 
-        # 中栏 (设置与进度)
-        self.center_frame = ttkb.Frame(self.center_right_paned, width=350)
-        self.center_right_paned.add(self.center_frame, weight=25)
-        self.center_frame.pack_propagate(False)
+        # 左上部分 (功能选择面板)
+        self.function_selector_frame = ttkb.Frame(self.left_paned_window, style='primary.TFrame')
+        self.left_paned_window.add(self.function_selector_frame, weight=40)
 
-        # 右栏 (功能工作区)
-        self.right_frame = ttkb.Frame(self.center_right_paned, style='secondary.TFrame')
-        self.center_right_paned.add(self.right_frame, weight=55)
-
-        # 初始化各栏内容
-        self.init_left_panel()
-        self.init_center_panel()
-        self.init_right_panel()
-
-    def init_left_panel(self):
-        """初始化左栏内容"""
-        # 设置左栏背景为更深的灰色
-        self.left_frame.configure(style='Primary.TFrame')
-        ttkb.Label(self.left_frame, text="🔧 Function Selection", font=("", 16, "bold"), bootstyle='inverse-primary').pack(pady=20)
-        self.function_buttons_frame = ttkb.Frame(self.left_frame, style='Primary.TFrame')
+        # 功能选择标题
+        ttkb.Label(self.function_selector_frame, text="🔧 Function Selection", font=("", 16, "bold"), bootstyle='inverse-primary').pack(pady=10, padx=10, anchor=W)
+        
+        # 功能按钮容器
+        self.function_buttons_frame = ttkb.Frame(self.function_selector_frame, style='primary.TFrame')
         self.function_buttons_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-    def init_center_panel(self):
-        """初始化中栏内容"""
-        self.center_title = ttkb.Label(self.center_frame, text="⚙️ Settings", font=("", 16, "bold"))
-        self.center_title.pack(pady=20)
-        self.settings_container = ttkb.Frame(self.center_frame)
+        # 左下部分 (设置控制面板)
+        self.settings_frame = ttkb.Frame(self.left_paned_window, style='primary.TFrame')
+        self.left_paned_window.add(self.settings_frame, weight=60)
+
+        # 设置标题
+        ttkb.Label(self.settings_frame, text="⚙️ Settings", font=("", 16, "bold"), bootstyle='inverse-primary').pack(pady=10, padx=10, anchor=W)
+        
+        # 设置容器
+        self.settings_container = ttkb.Frame(self.settings_frame, style='primary.TFrame')
         self.settings_container.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-    def init_right_panel(self):
-        """初始化右栏内容"""
-        self.right_title = ttkb.Label(self.right_frame, text="🎯 Workspace", font=("", 16, "bold"), bootstyle='inverse-secondary')
-        self.right_title.pack(pady=20)
+        # 右侧部分 (操作区)
+        self.right_frame = ttkb.Frame(self.main_paned_window, style='secondary.TFrame')
+        self.main_paned_window.add(self.right_frame, weight=70)
+        
+        # 操作区标题
+        self.right_title = ttkb.Label(self.right_frame, text="🎯 Operations & Results", font=("", 16, "bold"), bootstyle='inverse-secondary')
+        self.right_title.pack(pady=10, padx=10, anchor=W)
+        
+        # 操作区容器
         self.workspace_container = ttkb.Frame(self.right_frame, style='secondary.TFrame')
         self.workspace_container.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
@@ -308,7 +310,7 @@ class ModernApp:
         self.update_ui_for_module(module)
 
     def update_ui_for_module(self, module: BaseFunctionModule):
-        """更新中栏和右栏以反映当前模块"""
+        """更新界面以反映当前模块"""
         # 更新高亮状态
         for name, widgets in self.module_buttons.items():
             if name == module.name:
@@ -329,17 +331,16 @@ class ModernApp:
             widget.destroy()
 
         # 更新标题
-        self.center_title.config(text=f"⚙️ {module.display_name} Settings")
-        self.right_title.config(text=f"🎯 {module.display_name} Workspace")
+        self.right_title.config(text=f"🎯 {module.display_name} Operations & Results")
 
         # 加载新UI
         try:
-            # 让模块自己创建并返回它的UI面板
+            # 让模块自己创建并返回它的设置UI面板（放在左侧下部）
             settings_panel = module.create_settings_ui(self.settings_container)
             if settings_panel:
                 settings_panel.pack(fill=BOTH, expand=True)
 
-            # 同样为工作区创建UI
+            # 让模块创建工作区UI（放在右侧）
             workspace_panel = module.create_workspace_ui(self.workspace_container)
             if workspace_panel:
                 workspace_panel.pack(fill=BOTH, expand=True)
@@ -358,5 +359,5 @@ if __name__ == "__main__":
     else:
         root = ttkb.Window(themename="superhero")
         
-    app = ModernApp(root)
+    app = ImprovedModernApp(root)
     root.mainloop()

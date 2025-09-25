@@ -21,8 +21,8 @@ class DeduplicationModule(BaseFunctionModule):
     def __init__(self):
         super().__init__(
             name="deduplication",
-            display_name="图片去重",
-            description="查找并处理重复或相似的图片。",
+            display_name="Image Deduplication",
+            description="Find and process duplicate or similar images.",
             icon="🔍"
         )
         self.scan_thread = None
@@ -37,7 +37,7 @@ class DeduplicationModule(BaseFunctionModule):
         settings_frame = ttkb.Frame(parent, padding=10)
 
         # 1. 扫描路径（支持多个路径）
-        paths_frame = ttkb.Labelframe(settings_frame, text="扫描路径", padding=10)
+        paths_frame = ttkb.Labelframe(settings_frame, text="Scan Paths", padding=10)
         paths_frame.pack(fill=BOTH, pady=5, expand=True)
 
         # 路径列表显示区域
@@ -48,22 +48,22 @@ class DeduplicationModule(BaseFunctionModule):
         path_btn_frame = ttkb.Frame(paths_frame)
         path_btn_frame.pack(fill=X)
         
-        add_path_btn = ttkb.Button(path_btn_frame, text="添加路径", command=self.add_folder, bootstyle='success', width=10)
+        add_path_btn = ttkb.Button(path_btn_frame, text="Add Path", command=self.add_folder, bootstyle='success', width=10)
         add_path_btn.pack(side=LEFT, padx=(0, 5))
         
-        remove_path_btn = ttkb.Button(path_btn_frame, text="移除路径", command=self.remove_folder, bootstyle='danger', width=10)
+        remove_path_btn = ttkb.Button(path_btn_frame, text="Remove Path", command=self.remove_folder, bootstyle='danger', width=10)
         remove_path_btn.pack(side=LEFT, padx=5)
         
-        clear_paths_btn = ttkb.Button(path_btn_frame, text="清空路径", command=self.clear_folders, bootstyle='warning', width=10)
+        clear_paths_btn = ttkb.Button(path_btn_frame, text="Clear Paths", command=self.clear_folders, bootstyle='warning', width=10)
         clear_paths_btn.pack(side=LEFT, padx=5)
 
         # 2. 检测设置
-        options_frame = ttkb.Labelframe(settings_frame, text="检测设置", padding=10)
+        options_frame = ttkb.Labelframe(settings_frame, text="Detection Settings", padding=10)
         options_frame.pack(fill=X, pady=5, expand=True)
 
         sens_frame = ttkb.Frame(options_frame)
         sens_frame.pack(fill=X, pady=5)
-        ttkb.Label(sens_frame, text="相似度阈值:").pack(side=LEFT, padx=(0, 10))
+        ttkb.Label(sens_frame, text="Similarity Threshold:").pack(side=LEFT, padx=(0, 10))
         self.sensitivity_var = tk.DoubleVar(value=95)
         sens_scale = ttkb.Scale(sens_frame, from_=70, to=100, variable=self.sensitivity_var, orient=HORIZONTAL)
         sens_scale.pack(side=LEFT, fill=X, expand=True)
@@ -72,17 +72,17 @@ class DeduplicationModule(BaseFunctionModule):
         sens_scale.config(command=lambda val: self.sens_label.config(text=f"{float(val):.0f}%"))
 
         self.subdirs_var = tk.BooleanVar(value=True)
-        subdirs_check = ttkb.Checkbutton(options_frame, text="包含子目录", variable=self.subdirs_var, bootstyle='round-toggle')
+        subdirs_check = ttkb.Checkbutton(options_frame, text="Include Subdirectories", variable=self.subdirs_var, bootstyle='round-toggle')
         subdirs_check.pack(fill=X, pady=5)
 
         # 3. 操作控制
-        action_frame = ttkb.Labelframe(settings_frame, text="操作控制", padding=10)
+        action_frame = ttkb.Labelframe(settings_frame, text="Operation Control", padding=10)
         action_frame.pack(fill=X, pady=5, expand=True)
 
-        self.start_btn = ttkb.Button(action_frame, text="▶️ 开始扫描", command=self.start_scan, bootstyle='success')
+        self.start_btn = ttkb.Button(action_frame, text="▶️ Start Scan", command=self.start_scan, bootstyle='success')
         self.start_btn.pack(side=LEFT, fill=X, expand=True, padx=(0, 5))
 
-        self.stop_btn = ttkb.Button(action_frame, text="⏹️ 停止", command=self.stop_execution, bootstyle='danger', state=DISABLED)
+        self.stop_btn = ttkb.Button(action_frame, text="⏹️ Stop", command=self.stop_execution, bootstyle='danger', state=DISABLED)
         self.stop_btn.pack(side=LEFT, fill=X, expand=True, padx=5)
         
         return settings_frame
@@ -95,14 +95,14 @@ class DeduplicationModule(BaseFunctionModule):
         # 进度区域
         progress_frame = ttkb.Frame(workspace_frame)
         progress_frame.pack(fill=X, pady=5)
-        self.stats_label = ttkb.Label(progress_frame, text="尚未开始扫描。", font=("", 10))
+        self.stats_label = ttkb.Label(progress_frame, text="Scan not started yet.", font=("", 10))
         self.stats_label.pack(anchor=W)
         
         self.progress_bar = ttkb.Progressbar(progress_frame, bootstyle='info-striped')
         self.progress_bar.pack(fill=X, pady=5)
         
         # 日志区域
-        log_frame = ttkb.Labelframe(workspace_frame, text="扫描日志", padding=5)
+        log_frame = ttkb.Labelframe(workspace_frame, text="Scan Log", padding=5)
         log_frame.pack(fill=BOTH, expand=True, pady=10)
         
         self.log_text = tk.Text(log_frame, height=8, state='disabled')
@@ -113,7 +113,7 @@ class DeduplicationModule(BaseFunctionModule):
         log_scrollbar.pack(side="right", fill="y")
         
         # 结果区域
-        result_label = ttkb.Label(workspace_frame, text="扫描结果", font=("", 12, "bold"), bootstyle='primary')
+        result_label = ttkb.Label(workspace_frame, text="Scan Results", font=("", 12, "bold"), bootstyle='primary')
         result_label.pack(anchor=W, pady=(10, 5))
         
         result_container = ttkb.Frame(workspace_frame)
@@ -137,7 +137,7 @@ class DeduplicationModule(BaseFunctionModule):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self.initial_prompt = ttkb.Label(self.scrollable_frame, text="扫描结果将在这里显示...", font=("", 12, 'italic'))
+        self.initial_prompt = ttkb.Label(self.scrollable_frame, text="Scan results will be displayed here...", font=("", 12, 'italic'))
         self.initial_prompt.pack(pady=50)
 
         # 设置回调函数
@@ -397,26 +397,26 @@ class DeduplicationModule(BaseFunctionModule):
         if not file_paths:
             return
             
-        result = messagebox.askyesno("确认删除", f"确定要删除这 {len(file_paths)} 个文件吗？此操作不可撤销！")
+        result = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete these {len(file_paths)} files? This action cannot be undone!")
         if result:
             deleted_count = 0
             for file_path in file_paths:
                 try:
                     os.remove(file_path)
                     deleted_count += 1
-                    self.add_log_message(f"已删除文件: {file_path}", "info")
+                    self.add_log_message(f"Deleted file: {file_path}", "info")
                 except Exception as e:
-                    self.add_log_message(f"删除文件失败 {file_path}: {str(e)}", "error")
+                    self.add_log_message(f"Failed to delete file {file_path}: {str(e)}", "error")
                     
-            self.add_log_message(f"删除完成，成功删除 {deleted_count}/{len(file_paths)} 个文件", "info")
-            messagebox.showinfo("删除完成", f"成功删除 {deleted_count} 个文件")
+            self.add_log_message(f"Deletion completed, successfully deleted {deleted_count}/{len(file_paths)} files", "info")
+            messagebox.showinfo("Deletion Completed", f"Successfully deleted {deleted_count} files")
             
     def move_selected_files(self, file_paths):
         """移动选中的文件"""
         if not file_paths:
             return
             
-        target_dir = filedialog.askdirectory(title="选择目标文件夹")
+        target_dir = filedialog.askdirectory(title="Select Target Folder")
         if not target_dir:
             return
             
@@ -436,9 +436,9 @@ class DeduplicationModule(BaseFunctionModule):
                     
                 os.rename(file_path, target_path)
                 moved_count += 1
-                self.add_log_message(f"已移动文件: {file_path} -> {target_path}", "info")
+                self.add_log_message(f"Moved file: {file_path} -> {target_path}", "info")
             except Exception as e:
-                self.add_log_message(f"移动文件失败 {file_path}: {str(e)}", "error")
+                self.add_log_message(f"Failed to move file {file_path}: {str(e)}", "error")
                 
-        self.add_log_message(f"移动完成，成功移动 {moved_count}/{len(file_paths)} 个文件", "info")
-        messagebox.showinfo("移动完成", f"成功移动 {moved_count} 个文件")
+        self.add_log_message(f"Move completed, successfully moved {moved_count}/{len(file_paths)} files", "info")
+        messagebox.showinfo("Move Completed", f"Successfully moved {moved_count} files")
