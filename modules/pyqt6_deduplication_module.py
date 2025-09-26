@@ -755,7 +755,20 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
                     border-radius: 5px;
                     padding: 8px;
                 }
+                QFrame:selected {
+                    background-color: #2D2D2D;
+                    border: 1px solid #FF8C00;
+                }
             """)
+            card_frame.setCursor(Qt.CursorShape.PointingHandCursor)
+            
+            # 存储引用和选择状态
+            card_frame.group_files = dups
+            card_frame.is_selected = False
+            
+            # 连接鼠标点击事件
+            card_frame.mousePressEvent = lambda event, cf=card_frame: self._on_card_clicked(cf, event)
+            
             card_layout = QVBoxLayout(card_frame)
             card_layout.setContentsMargins(8, 8, 8, 8)
             card_layout.setSpacing(8)
@@ -881,6 +894,47 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
             print(f"无法加载图片 {file_path}: {e}")
             return None
 
+    def _on_card_clicked(self, card_frame, event):
+        """处理卡片点击事件"""
+        # 检查是否是左键点击
+        if event.button() == Qt.MouseButton.LeftButton:
+            # 切换选中状态
+            card_frame.is_selected = not card_frame.is_selected
+            self._update_card_selection_style(card_frame)
+            
+            # 更新选择计数
+            self._update_selection_count()
+
+    def _update_card_selection_style(self, card_frame):
+        """更新卡片选中样式"""
+        if card_frame.is_selected:
+            card_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #2D2D2D;
+                    border: 1px solid #FF8C00;
+                    border-radius: 5px;
+                    padding: 8px;
+                }
+            """)
+        else:
+            card_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #1B1B1B;
+                    border: 1px solid #353535;
+                    border-radius: 5px;
+                    padding: 8px;
+                }
+                QFrame:hover {
+                    border: 1px solid #555555;
+                }
+            """)
+
+    def _update_selection_count(self):
+        """更新选择计数"""
+        selected_count = sum(1 for card in self.card_frames_map.keys() if getattr(card, 'is_selected', False))
+        if hasattr(self, 'selection_count_label') and self.selection_count_label:
+            self.selection_count_label.setText(f"Selected: {selected_count}")
+
     def toggle_group_selection(self, group_files, checkbox_var):
         """Toggle selection of entire group"""
         # Simplified implementation, actual implementation needs to handle checkbox state
@@ -888,11 +942,19 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
 
     def select_all_images(self):
         """Select all images"""
-        pass
+        for card_frame in self.card_frames_map.keys():
+            if hasattr(card_frame, 'is_selected'):
+                card_frame.is_selected = True
+                self._update_card_selection_style(card_frame)
+        self._update_selection_count()
 
     def unselect_all_images(self):
         """Unselect all images"""
-        pass
+        for card_frame in self.card_frames_map.keys():
+            if hasattr(card_frame, 'is_selected'):
+                card_frame.is_selected = False
+                self._update_card_selection_style(card_frame)
+        self._update_selection_count()
 
     def delete_selected_files_advanced(self):
         """Advanced delete function"""
