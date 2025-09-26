@@ -1,0 +1,40 @@
+{
+  "theme": "blue",
+  "window_geometry": "1400x900+100+100",
+  "last_module": "dedup",
+  "module_settings": {
+    "dedup": {
+      "sensitivity": 0.95,
+      "min_confidence": 0.5,
+      "scan_subdirectories": true,
+      "supported_formats": [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".webp"
+      ]
+    },
+    "avif_convert": {
+      "quality": 85,
+      "preserve_structure": true,
+      "create_backup": false
+    },
+    "batch_rename": {
+      "pattern": "IMG_{001}",
+      "start_number": 1,
+      "preserve_extension": true
+    },
+    "image_optimizer": {
+      "quality": 85,
+      "optimize_mode": "balanced",
+      "create_backup": false
+    }
+  },
+  "ui_settings": {
+    "show_confirmations": true,
+    "auto_save": true,
+    "max_history_items": 50
+  }
+}
