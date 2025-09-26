@@ -420,7 +420,8 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
                 color: white;
                 border: 1px solid #6c757d;
                 border-radius: 4px;
-                min-height: 100px;
+                min-height: 50px;
+                max-height: 100px;
             }
         """)
         self.log_text.setReadOnly(True)
