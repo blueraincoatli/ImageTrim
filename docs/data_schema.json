@@ -1,0 +1,285 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ImageProcessingToolDataSchema",
+  "description": "图片处理工具套件的数据结构定义",
+  "type": "object",
+  "definitions": {
+    "FileInfo": {
+      "type": "object",
+      "description": "文件信息",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "文件路径"
+        },
+        "name": {
+          "type": "string",
+          "description": "文件名"
+        },
+        "size": {
+          "type": "integer",
+          "description": "文件大小(字节)"
+        },
+        "modified_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "修改时间"
+        },
+        "format": {
+          "type": "string",
+          "description": "文件格式"
+        }
+      },
+      "required": [
+        "path",
+        "name",
+        "size",
+        "modified_time",
+        "format"
+      ]
+    },
+    "DuplicateGroup": {
+      "type": "object",
+      "description": "重复文件组",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "组ID"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FileInfo"
+          },
+          "description": "文件列表"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "置信度"
+        },
+        "match_type": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "similar"
+          ],
+          "description": "匹配类型"
+        },
+        "primary_file": {
+          "type": "string",
+          "description": "主文件路径"
+        },
+        "selected_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "用户选择的文件路径列表"
+        }
+      },
+      "required": [
+        "id",
+        "files",
+        "confidence",
+        "match_type"
+      ]
+    },
+    "ProgressInfo": {
+      "type": "object",
+      "description": "进度信息",
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "进度值(百分比)"
+        },
+        "message": {
+          "type": "string",
+          "description": "进度消息"
+        },
+        "total": {
+          "type": "integer",
+          "description": "总任务数"
+        },
+        "completed": {
+          "type": "integer",
+          "description": "已完成任务数"
+        }
+      },
+      "required": [
+        "value",
+        "message"
+      ]
+    },
+    "LogMessage": {
+      "type": "object",
+      "description": "日志消息",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "时间戳"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error",
+            "critical"
+          ],
+          "description": "日志级别"
+        },
+        "message": {
+          "type": "string",
+          "description": "日志内容"
+        },
+        "module": {
+          "type": "string",
+          "description": "模块名称"
+        }
+      },
+      "required": [
+        "timestamp",
+        "level",
+        "message"
+      ]
+    },
+    "FunctionModuleConfig": {
+      "type": "object",
+      "description": "功能模块配置",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "模块名称"
+        },
+        "display_name": {
+          "type": "string",
+          "description": "显示名称"
+        },
+        "description": {
+          "type": "string",
+          "description": "描述"
+        },
+        "icon": {
+          "type": "string",
+          "description": "图标"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "是否启用"
+        },
+        "settings": {
+          "type": "object",
+          "description": "模块特定设置"
+        }
+      },
+      "required": [
+        "name",
+        "display_name",
+        "description",
+        "icon",
+        "enabled"
+      ]
+    },
+    "ApplicationSettings": {
+      "type": "object",
+      "description": "应用设置",
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": [
+            "zh_CN",
+            "en_US"
+          ],
+          "description": "语言设置"
+        },
+        "theme": {
+          "type": "string",
+          "description": "主题名称"
+        },
+        "window_size": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "integer"
+            },
+            "height": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ]
+        },
+        "window_position": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ]
+        },
+        "splitter_sizes": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "分割器尺寸"
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FunctionModuleConfig"
+          },
+          "description": "功能模块配置列表"
+        }
+      }
+    }
+  },
+  "properties": {
+    "app_settings": {
+      "$ref": "#/definitions/ApplicationSettings"
+    },
+    "current_module": {
+      "type": "string",
+      "description": "当前激活的模块名称"
+    },
+    "scan_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "扫描路径列表"
+    },
+    "duplicate_groups": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/DuplicateGroup"
+      },
+      "description": "重复文件组列表"
+    },
+    "progress": {
+      "$ref": "#/definitions/ProgressInfo"
+    },
+    "logs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/LogMessage"
+      },
+      "description": "日志消息列表"
+    }
+  }
+}

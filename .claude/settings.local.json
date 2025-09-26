@@ -7,7 +7,8 @@
       "Bash(copy:*)",
       "Bash(pyinstaller:*)",
       "Bash(D:/cleanPython/python.exe --version)",
-      "Bash(D:/cleanPython/python.exe:*)"
+      "Bash(D:/cleanPython/python.exe:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

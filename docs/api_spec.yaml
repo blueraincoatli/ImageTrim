@@ -1,0 +1,182 @@
+openapi: 3.0.0
+info:
+  title: 图片处理工具套件API
+  description: 图片处理工具套件的内部接口定义
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: 本地开发服务器
+
+paths:
+  /function/modules:
+    get:
+      summary: 获取功能模块列表
+      description: 获取所有已注册的功能模块信息
+      responses:
+        '200':
+          description: 成功返回功能模块列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FunctionModule'
+
+  /function/activate:
+    post:
+      summary: 激活功能模块
+      description: 激活指定的功能模块
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                module_name:
+                  type: string
+                  description: 模块名称
+              required:
+                - module_name
+      responses:
+        '200':
+          description: 成功激活模块
+        '404':
+          description: 模块未找到
+
+  /function/execute:
+    post:
+      summary: 执行功能
+      description: 执行当前激活模块的功能
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                params:
+                  type: object
+                  description: 执行参数
+      responses:
+        '200':
+          description: 开始执行
+        '400':
+          description: 参数错误
+
+  /function/stop:
+    post:
+      summary: 停止执行
+      description: 停止当前正在执行的功能
+      responses:
+        '200':
+          description: 成功停止
+
+  /progress:
+    get:
+      summary: 获取进度信息
+      description: 获取当前任务的进度信息
+      responses:
+        '200':
+          description: 成功返回进度信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressInfo'
+
+  /logs:
+    get:
+      summary: 获取日志信息
+      description: 获取应用日志信息
+      parameters:
+        - name: level
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [debug, info, warning, error, critical]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: 成功返回日志信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogMessage'
+
+components:
+  schemas:
+    FunctionModule:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 模块名称
+        display_name:
+          type: string
+          description: 显示名称
+        description:
+          type: string
+          description: 描述
+        icon:
+          type: string
+          description: 图标
+        enabled:
+          type: boolean
+          description: 是否启用
+
+    ProgressInfo:
+      type: object
+      properties:
+        value:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: 进度值(百分比)
+        message:
+          type: string
+          description: 进度消息
+        total:
+          type: integer
+          description: 总任务数
+        completed:
+          type: integer
+          description: 已完成任务数
+
+    LogMessage:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: 时间戳
+        level:
+          type: string
+          enum: [debug, info, warning, error, critical]
+          description: 日志级别
+        message:
+          type: string
+          description: 日志内容
+        module:
+          type: string
+          description: 模块名称
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key

@@ -49,84 +49,83 @@ class ImprovedModernApp:
             first_module_name = self.function_manager.get_module_names()[0]
             self.function_manager.activate_module(first_module_name)
             self.update_ui_for_module(self.function_manager.get_module(first_module_name))
+            
+        # 确保所有样式都被正确应用
+        self.root.update()
 
     def setup_custom_theme(self):
         """设置自定义主题"""
         # 使用darkly主题作为基础
         self.style = ttkb.Style(theme='darkly')
         
-        # 自定义颜色配置
-        self.style.configure('.', font=('Arial', 14))  # 设置默认字体大小为14px
+        # 设置全局字体大小，确保在各种显示器上都能清晰显示
+        self.style.configure('.', font=('Arial', 18), foreground='white')
         
-        # 配置按钮样式为橙色
+        # 配置按钮样式（不设置固定字体大小）
         self.style.configure('Primary.TButton', 
                            background='#FF8C00',  # 橙色
                            foreground='white',
-                           bordercolor='#FF8C00',
-                           font=('Arial', 14))
+                           bordercolor='#FF8C00')
         
         self.style.configure('Success.TButton',
-                           background='#FFA500',  # 橙色
+                           background='#FF8C00',  # 橙色
                            foreground='white',
-                           bordercolor='#FFA500',
-                           font=('Arial', 14))
+                           bordercolor='#FF8C00')
         
         self.style.configure('Danger.TButton',
-                           background='#FF4500',  # 深橙色
+                           background='#FF4500',  # 红色
                            foreground='white',
-                           bordercolor='#FF4500',
-                           font=('Arial', 14))
+                           bordercolor='#FF4500')
         
         self.style.configure('Warning.TButton',
-                           background='#FFA07A',  # 浅橙色
+                           background='#FF8C00',  # 橙色
                            foreground='white',
-                           bordercolor='#FFA500',
-                           font=('Arial', 14))
+                           bordercolor='#FF8C00')
         
-        # 配置框架样式
+        # 配置框架样式 - 统一使用深灰色背景
+        self.style.configure('TFrame',
+                           background='#1B1B1B')  # 所有框架使用深灰色背景
+        
         self.style.configure('Primary.TFrame',
-                           background='#1B1B1B')  # 更深的灰色用于左栏
+                           background='#1B1B1B')  # 深灰色用于左栏
 
         self.style.configure('Secondary.TFrame',
-                           background='#2B2B2B')  # 深灰色用于右栏
+                           background='#1B1B1B')  # 深灰色用于右栏
+                            
+        # 配置卡片框架样式（功能卡片）
+        self.style.configure('Card.TFrame',
+                           background='#1B1B1B')  # 深灰色背景，与设置区一致
                            
-        
-        # 配置信息框架样式（未选中的功能卡片）
-        self.style.configure('Info.TFrame',
-                           background='#353535')  # 浅灰色用于未选中的功能卡片
-                           
-        # 配置成功框架样式（选中的功能卡片）
-        self.style.configure('Success.TFrame',
-                           background='#353535',  # 浅灰色用于选中的功能卡片
+        # 配置选中卡片样式
+        self.style.configure('SelectedCard.TFrame',
+                           background='#353535',  # 浅灰色背景（选中状态）
                            relief='solid',
-                           borderwidth=2)
+                           borderwidth=2,
+                           bordercolor='#FF8C00')  # 橙色边框
         
-        # 为选中的卡片添加橙色边框样式
-        self.style.map('Success.TFrame',
-                      bordercolor=[('active', '#FF8C00'), ('!active', '#FF8C00')])
-        
-        # 配置标签框架样式
+        # 配置标签框架样式 - 标题栏使用深灰色
         self.style.configure('Info.TLabelframe',
-                           background='#2B2B2B',
-                           foreground='#FF8C00',  # 橙色文字
-                           font=('Arial', 14))
+                           background='#1B1B1B',  # 深灰色背景
+                           foreground='#FF8C00')  # 不设置固定字体
         
         self.style.configure('TLabelframe.Label',
-                           background='#2B2B2B',
-                           foreground='#FF8C00',  # 橙色文字
-                           font=('Arial', 14))
+                           background='#1B1B1B',  # 深灰色背景
+                           foreground='#FF8C00')  # 不设置固定字体
         
-        # 配置标签样式
+        # 配置标签样式 - 统一使用深灰色背景
         self.style.configure('TLabel',
-                           background='#1B1B1B',  # 左栏背景色
-                           foreground='#FFFFFF',  # 白色文字
-                           font=('Arial', 14))
+                           background='#1B1B1B',  # 深灰色背景
+                           foreground='#FFFFFF')  # 不设置固定字体
+        
+        # 配置逆色标签样式
+        self.style.configure('Inverse.TLabel',
+                           background='#353535',  # 浅灰色背景
+                           foreground='#FFFFFF')  # 不设置固定字体
         
         # 配置输入框样式
         self.style.configure('TEntry',
                            fieldbackground='#4B4B4B',  # 深灰色输入框
-                           foreground='#FFFFFF',       # 白色文字
-                           font=('Arial', 14))
+                           foreground='#FFFFFF')       # 不设置固定字体
         
         # 配置滚动条样式
         self.style.configure('TScrollbar',
@@ -141,7 +140,7 @@ class ImprovedModernApp:
                            bordercolor='#2B2B2B')
         
         # 设置主窗口背景色
-        self.root.configure(bg='#2B2B2B')
+        self.root.configure(bg='#1B1B1B')
         
     def setup_rounded_styles(self):
         """设置改进的样式"""
@@ -230,33 +229,33 @@ class ImprovedModernApp:
         self.left_paned_window.add(self.function_selector_frame, weight=40)
 
         # 功能选择标题
-        ttkb.Label(self.function_selector_frame, text="🔧 Function Selection", font=("", 16, "bold"), bootstyle='inverse-primary').pack(pady=10, padx=10, anchor=W)
+        ttkb.Label(self.function_selector_frame, text="🔧 Function Selection", font=("", 16, "bold"), style='Inverse.TLabel').pack(pady=10, padx=10, anchor=W)
         
         # 功能按钮容器
-        self.function_buttons_frame = ttkb.Frame(self.function_selector_frame, style='primary.TFrame')
+        self.function_buttons_frame = ttkb.Frame(self.function_selector_frame, style='Primary.TFrame')
         self.function_buttons_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
         # 左下部分 (设置控制面板)
-        self.settings_frame = ttkb.Frame(self.left_paned_window, style='primary.TFrame')
+        self.settings_frame = ttkb.Frame(self.left_paned_window, style='Primary.TFrame')
         self.left_paned_window.add(self.settings_frame, weight=60)
 
         # 设置标题
-        ttkb.Label(self.settings_frame, text="⚙️ Settings", font=("", 16, "bold"), bootstyle='inverse-primary').pack(pady=10, padx=10, anchor=W)
+        ttkb.Label(self.settings_frame, text="⚙️ Settings", font=("", 16, "bold"), style='Inverse.TLabel').pack(pady=10, padx=10, anchor=W)
         
         # 设置容器
-        self.settings_container = ttkb.Frame(self.settings_frame, style='primary.TFrame')
+        self.settings_container = ttkb.Frame(self.settings_frame, style='Primary.TFrame')
         self.settings_container.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
         # 右侧部分 (操作区)
-        self.right_frame = ttkb.Frame(self.main_paned_window, style='secondary.TFrame')
+        self.right_frame = ttkb.Frame(self.main_paned_window, style='Secondary.TFrame')
         self.main_paned_window.add(self.right_frame, weight=70)
         
         # 操作区标题
-        self.right_title = ttkb.Label(self.right_frame, text="🎯 Operations & Results", font=("", 16, "bold"), bootstyle='inverse-secondary')
+        self.right_title = ttkb.Label(self.right_frame, text="🎯 Operations & Results", font=("", 16, "bold"), style='Inverse.TLabel')
         self.right_title.pack(pady=10, padx=10, anchor=W)
         
         # 操作区容器
-        self.workspace_container = ttkb.Frame(self.right_frame, style='secondary.TFrame')
+        self.workspace_container = ttkb.Frame(self.right_frame, style='Secondary.TFrame')
         self.workspace_container.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
     def populate_function_list(self):
@@ -268,7 +267,7 @@ class ImprovedModernApp:
             # 使用Frame作为卡片，支持点击选择
             card = ttkb.Frame(
                 self.function_buttons_frame,
-                bootstyle='info',  # 使用浅灰色背景
+                style='Card.TFrame',  # 使用深灰色背景
                 padding=15,
                 relief='flat',
                 borderwidth=0
@@ -314,15 +313,15 @@ class ImprovedModernApp:
         # 更新高亮状态
         for name, widgets in self.module_buttons.items():
             if name == module.name:
-                # 选中的卡片使用成功样式（带橙色边框）
-                widgets['card'].config(bootstyle='success', relief='solid', borderwidth=2)
-                widgets['title'].config(bootstyle='inverse-info')
-                widgets['desc'].config(bootstyle='inverse-info')
+                # 选中的卡片使用选中样式（带橙色边框）
+                widgets['card'].config(style='SelectedCard.TFrame')
+                widgets['title'].config(style='Inverse.TLabel')
+                widgets['desc'].config(style='Inverse.TLabel')
             else:
-                # 未选中的卡片使用信息样式（灰色背景，无边框）
-                widgets['card'].config(bootstyle='info', relief='flat', borderwidth=0)
-                widgets['title'].config(bootstyle='inverse-info')
-                widgets['desc'].config(bootstyle='inverse-info')
+                # 未选中的卡片使用卡片样式（浅灰色背景，无边框）
+                widgets['card'].config(style='Card.TFrame')
+                widgets['title'].config(style='Inverse.TLabel')
+                widgets['desc'].config(style='Inverse.TLabel')
 
         # 清空现有UI
         for widget in self.settings_container.winfo_children():
