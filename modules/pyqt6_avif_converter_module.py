@@ -32,7 +32,7 @@ class PyQt6AVIFConverterModule(PyQt6BaseFunctionModule):
     def __init__(self):
         super().__init__(
             name="pyqt6_avif_converter",
-            display_name="PyQt6 AVIF Converter",
+            display_name="AVIF Converter",
             description="Convert images to AVIF format to save storage space.",
             icon="🔄"
         )

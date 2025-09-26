@@ -460,46 +460,47 @@ class PyQt6ModernApp(QMainWindow):
         for name in self.function_manager.get_module_names():
             module = self.function_manager.get_module(name)
             
-            # 创建功能卡片按钮
-            card_button = QPushButton(f"{module.icon} {module.display_name}")
-            card_button.setObjectName(f"ModuleButton_{name}")
-            card_button.setStyleSheet(
-                f"""
-                QPushButton {{
-                    text-align: left;
-                    padding: 15px;
+            # 创建一体化功能卡片
+            card_container = QFrame()
+            card_container.setFrameStyle(QFrame.Shape.StyledPanel)
+            card_container.setStyleSheet(
+                """
+                QFrame {
                     background-color: #1B1B1B;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    font-size: 14px;
-                    font-weight: bold;
-                }}
-                QPushButton:hover {{
-                    background-color: #353535;
-                }}
+                    border: 2px solid #1B1B1B;
+                    border-radius: 8px;
+                    padding: 15px;
+                }
+                QFrame:hover {
+                    border: 2px solid #353535;
+                }
                 """
             )
-            card_button.setCursor(Qt.CursorShape.PointingHandCursor)
-            card_button.clicked.connect(lambda checked, m=module: self.switch_module(m))
+            card_container.setCursor(Qt.CursorShape.PointingHandCursor)
+            card_layout = QVBoxLayout(card_container)
+            card_layout.setContentsMargins(15, 15, 15, 15)
+            card_layout.setSpacing(10)
             
-            # 添加描述标签
+            # 功能标题
+            title_label = QLabel(f"{module.icon} {module.display_name}")
+            title_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+            
+            # 功能描述
             desc_label = QLabel(module.description)
-            desc_label.setStyleSheet("color: #CCCCCC; font-size: 12px; padding: 0 15px 15px 15px;")
+            desc_label.setStyleSheet("color: #CCCCCC; font-size: 12px;")
             desc_label.setWordWrap(True)
             
-            # 创建包含按钮和描述的容器
-            card_container = QWidget()
-            card_layout = QVBoxLayout(card_container)
-            card_layout.setContentsMargins(5, 5, 5, 5)
-            card_layout.addWidget(card_button)
+            # 添加组件到卡片
+            card_layout.addWidget(title_label)
             card_layout.addWidget(desc_label)
+            
+            # 连接点击事件
+            card_container.mousePressEvent = lambda event, m=module: self.switch_module(m)
             
             # 添加到功能按钮框架
             self.function_buttons_frame.layout().addWidget(card_container)
             
             self.module_buttons[name] = {
-                'button': card_button, 
                 'container': card_container,
                 'module': module
             }
@@ -519,13 +520,14 @@ class PyQt6ModernApp(QMainWindow):
         # 更新高亮状态
         for name, widgets in self.module_buttons.items():
             if name == module.name:
-                # 选中的卡片使用选中样式（带橙色边框）
+                # 选中的卡片使用选中样式（带橙色边框，背景变浅）
                 widgets['container'].setStyleSheet(
                     """
-                    QWidget {
-                        background-color: #353535;
+                    QFrame {
+                        background-color: #2D2D2D;
                         border: 2px solid #FF8C00;
-                        border-radius: 5px;
+                        border-radius: 8px;
+                        padding: 15px;
                     }
                     """
                 )
@@ -533,10 +535,14 @@ class PyQt6ModernApp(QMainWindow):
                 # 未选中的卡片使用默认样式
                 widgets['container'].setStyleSheet(
                     """
-                    QWidget {
+                    QFrame {
                         background-color: #1B1B1B;
-                        border: none;
-                        border-radius: 5px;
+                        border: 2px solid #1B1B1B;
+                        border-radius: 8px;
+                        padding: 15px;
+                    }
+                    QFrame:hover {
+                        border: 2px solid #353535;
                     }
                     """
                 )

@@ -32,7 +32,7 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
     def __init__(self):
         super().__init__(
             name="pyqt6_deduplication",
-            display_name="PyQt6 Image Deduplication",
+            display_name="Image Deduplication",
             description="Find and process duplicate or similar images with advanced selection.",
             icon="🔍"
         )
