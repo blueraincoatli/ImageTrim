@@ -383,14 +383,34 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
         move_btn.clicked.connect(self.move_selected_files_advanced)
         toolbar_layout.addWidget(move_btn)
         
+        # Toggle log button
+        self.toggle_log_btn = QPushButton(" Log")
+        self.toggle_log_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 12px;
+                min-width: 90px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        self.toggle_log_btn.clicked.connect(self.toggle_log_visibility)
+        toolbar_layout.addWidget(self.toggle_log_btn)
+        
         toolbar_layout.addStretch()
         
         workspace_layout.addWidget(toolbar_frame)
         
-        # Log area
-        log_frame = QGroupBox("Log")
-        log_frame.setStyleSheet("QGroupBox { background-color: #1B1B1B; color: white; border: 1px solid #353535; font-weight: bold; }")
-        log_layout = QVBoxLayout(log_frame)
+        # Log area (hidden by default)
+        self.log_frame = QGroupBox("Log")
+        self.log_frame.setStyleSheet("QGroupBox { background-color: #1B1B1B; color: white; border: 1px solid #353535; font-weight: bold; }")
+        log_layout = QVBoxLayout(self.log_frame)
         log_layout.setContentsMargins(10, 20, 10, 10)
         
         self.log_text = QTextEdit()
@@ -406,14 +426,18 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
         self.log_text.setReadOnly(True)
         log_layout.addWidget(self.log_text)
         
-        workspace_layout.addWidget(log_frame)
+        # Initially hide log area
+        self.log_frame.setVisible(False)
+        self.log_visible = False
+        
+        workspace_layout.addWidget(self.log_frame)
         
         # Results area
         result_label = QLabel("Scan Results")
         result_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
         workspace_layout.addWidget(result_label)
         
-        # Results scroll area
+        # Results scroll area (expand to fill available space)
         self.scroll_area = QScrollArea()
         self.scroll_area.setStyleSheet("""
             QScrollArea {
@@ -428,6 +452,7 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
         self.scrollable_frame.setStyleSheet("background-color: #1B1B1B;")
         self.scroll_area.setWidget(self.scrollable_frame)
         
+        # Set the scroll area to expand and take up available space
         workspace_layout.addWidget(self.scroll_area)
         
         # 设置回调函数
@@ -875,6 +900,15 @@ class PyQt6DeduplicationModule(PyQt6BaseFunctionModule):
     def move_selected_files_advanced(self):
         """Advanced move function"""
         pass
+    
+    def toggle_log_visibility(self):
+        """Toggle log area visibility"""
+        self.log_visible = not self.log_visible
+        self.log_frame.setVisible(self.log_visible)
+        if self.log_visible:
+            self.toggle_log_btn.setText(" Hide Log")
+        else:
+            self.toggle_log_btn.setText(" Show Log")
 
     def _find_duplicates_progressive(self, hashes, threshold):
         """
