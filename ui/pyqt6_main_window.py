@@ -462,7 +462,6 @@ class PyQt6ModernApp(QMainWindow):
             
             # 创建一体化功能卡片
             card_container = QFrame()
-            card_container.setFrameStyle(QFrame.Shape.StyledPanel)
             card_container.setStyleSheet(
                 """
                 QFrame {
@@ -478,16 +477,17 @@ class PyQt6ModernApp(QMainWindow):
             )
             card_container.setCursor(Qt.CursorShape.PointingHandCursor)
             card_layout = QVBoxLayout(card_container)
-            card_layout.setContentsMargins(15, 15, 15, 15)
+            card_layout.setContentsMargins(0, 0, 0, 0)  # 移除内部边距
             card_layout.setSpacing(10)
             
             # 功能标题
             title_label = QLabel(f"{module.icon} {module.display_name}")
-            title_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+            title_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold; padding: 0px; border: none;")
+            title_label.setWordWrap(True)
             
             # 功能描述
             desc_label = QLabel(module.description)
-            desc_label.setStyleSheet("color: #CCCCCC; font-size: 12px;")
+            desc_label.setStyleSheet("color: #CCCCCC; font-size: 12px; padding: 0px; border: none;")
             desc_label.setWordWrap(True)
             desc_label.setAlignment(Qt.AlignmentFlag.AlignTop)  # 顶部对齐
             
@@ -522,12 +522,12 @@ class PyQt6ModernApp(QMainWindow):
         # 更新高亮状态
         for name, widgets in self.module_buttons.items():
             if name == module.name:
-                # 选中的卡片使用选中样式（背景变浅，无边框）
+                # 选中的卡片使用选中样式（橙色边框）
                 widgets['container'].setStyleSheet(
                     """
                     QFrame {
                         background-color: #2D2D2D;
-                        border: 1px solid #353535;
+                        border: 2px solid #FF8C00;
                         border-radius: 8px;
                         padding: 15px;
                     }
