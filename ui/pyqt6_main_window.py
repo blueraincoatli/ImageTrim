@@ -377,10 +377,6 @@ class PyQt6ModernApp(QMainWindow):
         self.function_selector_frame = QFrame()
         self.function_selector_frame.setObjectName("FunctionSelectorFrame")
         
-        # 功能选择标题
-        function_title = QLabel("🔧 Function Selection")
-        function_title.setObjectName("FunctionTitle")
-        
         # 功能按钮容器
         self.function_buttons_frame = QFrame()
         self.function_buttons_frame.setObjectName("FunctionButtonsFrame")
@@ -394,16 +390,11 @@ class PyQt6ModernApp(QMainWindow):
         function_layout = QVBoxLayout(self.function_selector_frame)
         function_layout.setContentsMargins(0, 0, 0, 0)
         function_layout.setSpacing(0)
-        function_layout.addWidget(function_title)
         function_layout.addWidget(self.function_buttons_frame)
         
         # 左下部分 (设置控制面板)
         self.settings_frame = QFrame()
         self.settings_frame.setObjectName("SettingsFrame")
-        
-        # 设置标题
-        settings_title = QLabel("⚙️ Settings")
-        settings_title.setObjectName("SettingsTitle")
         
         # 设置容器
         self.settings_container = QFrame()
@@ -418,7 +409,6 @@ class PyQt6ModernApp(QMainWindow):
         settings_layout = QVBoxLayout(self.settings_frame)
         settings_layout.setContentsMargins(0, 0, 0, 0)
         settings_layout.setSpacing(0)
-        settings_layout.addWidget(settings_title)
         settings_layout.addWidget(self.settings_container)
         
         # 将左右部分添加到左侧分割器
@@ -437,10 +427,6 @@ class PyQt6ModernApp(QMainWindow):
         self.right_frame = QFrame()
         self.right_frame.setObjectName("RightFrame")
         
-        # 操作区标题
-        self.right_title = QLabel("🎯 Operations & Results")
-        self.right_title.setObjectName("WorkspaceTitle")
-        
         # 操作区容器
         self.workspace_container = QFrame()
         self.workspace_container.setObjectName("WorkspaceContainer")
@@ -454,7 +440,6 @@ class PyQt6ModernApp(QMainWindow):
         right_layout = QVBoxLayout(self.right_frame)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
-        right_layout.addWidget(self.right_title)
         right_layout.addWidget(self.workspace_container)
         
         # 将左右部分添加到主分割器
@@ -559,9 +544,6 @@ class PyQt6ModernApp(QMainWindow):
         # 清空现有UI
         self.clear_layout(self.settings_container.layout())
         self.clear_layout(self.workspace_container.layout())
-
-        # 更新标题
-        self.right_title.setText(f"🎯 {module.display_name} Operations & Results")
 
         # 加载新UI
         try:
