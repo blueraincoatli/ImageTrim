@@ -467,12 +467,12 @@ class PyQt6ModernApp(QMainWindow):
                 """
                 QFrame {
                     background-color: #1B1B1B;
-                    border: 2px solid #1B1B1B;
+                    border: 1px solid #353535;
                     border-radius: 8px;
                     padding: 15px;
                 }
                 QFrame:hover {
-                    border: 2px solid #353535;
+                    background-color: #252525;
                 }
                 """
             )
@@ -489,10 +489,12 @@ class PyQt6ModernApp(QMainWindow):
             desc_label = QLabel(module.description)
             desc_label.setStyleSheet("color: #CCCCCC; font-size: 12px;")
             desc_label.setWordWrap(True)
+            desc_label.setAlignment(Qt.AlignmentFlag.AlignTop)  # 顶部对齐
             
             # 添加组件到卡片
             card_layout.addWidget(title_label)
             card_layout.addWidget(desc_label)
+            card_layout.addStretch()  # 添加弹性空间，确保布局正确
             
             # 连接点击事件
             card_container.mousePressEvent = lambda event, m=module: self.switch_module(m)
@@ -520,12 +522,12 @@ class PyQt6ModernApp(QMainWindow):
         # 更新高亮状态
         for name, widgets in self.module_buttons.items():
             if name == module.name:
-                # 选中的卡片使用选中样式（带橙色边框，背景变浅）
+                # 选中的卡片使用选中样式（背景变浅，无边框）
                 widgets['container'].setStyleSheet(
                     """
                     QFrame {
                         background-color: #2D2D2D;
-                        border: 2px solid #FF8C00;
+                        border: 1px solid #353535;
                         border-radius: 8px;
                         padding: 15px;
                     }
@@ -537,12 +539,12 @@ class PyQt6ModernApp(QMainWindow):
                     """
                     QFrame {
                         background-color: #1B1B1B;
-                        border: 2px solid #1B1B1B;
+                        border: 1px solid #353535;
                         border-radius: 8px;
                         padding: 15px;
                     }
                     QFrame:hover {
-                        border: 2px solid #353535;
+                        background-color: #252525;
                     }
                     """
                 )
