@@ -8,7 +8,8 @@
       "Bash(pyinstaller:*)",
       "Bash(D:/cleanPython/python.exe --version)",
       "Bash(D:/cleanPython/python.exe:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

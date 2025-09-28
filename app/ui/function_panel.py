@@ -31,10 +31,10 @@ class FunctionCard(QPushButton):
         
         # 功能图标和名称
         title_label = QLabel(f"{self.module.icon} {self.module.display_name}")
-        title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: black;")
         
         desc_label = QLabel(self.module.description)
-        desc_label.setStyleSheet("font-size: 12px; color: #CCCCCC;")
+        desc_label.setStyleSheet("font-size: 12px; color: black;")
         desc_label.setWordWrap(True)
         
         layout.addWidget(title_label)
@@ -47,16 +47,22 @@ class FunctionCard(QPushButton):
                 text-align: left;
                 border: none;
                 border-radius: 6px;
-                background-color: #2d2d30;
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, 
+                    stop: 0 #ffcce6, stop: 0.25 #cce6ff, stop: 0.5 #ffe6cc, 
+                    stop: 0.75 #e6ccff, stop: 1 #ccffe6);
                 padding: 15px;
             }
             
             FunctionCard:hover {
-                background-color: #333337;
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, 
+                    stop: 0 #ffddee, stop: 0.25 #ddeeff, stop: 0.5 #ffeedd, 
+                    stop: 0.75 #eeddff, stop: 1 #ddeeef);
             }
             
             FunctionCard:checked {
-                background-color: #0078d7;
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, 
+                    stop: 0 #ff66b3, stop: 0.25 #66b3ff, stop: 0.5 #ffcc66, 
+                    stop: 0.75 #cc66ff, stop: 1 #66ffcc);
             }
         """)
 

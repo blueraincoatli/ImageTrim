@@ -106,8 +106,11 @@ class DeduplicationModule(BaseFunctionModule):
         Returns:
             QWidget: 工作区UI面板
         """
-        # 工作区UI由WorkspacePanel特殊处理，这里返回None
-        return None
+        # 延迟导入结果面板，避免循环导入
+        from modules.deduplication.results_panel import DeduplicationResultsPanel
+        if self.workspace_ui is None:
+            self.workspace_ui = DeduplicationResultsPanel(self)
+        return self.workspace_ui
 
     def add_path(self):
         """添加扫描路径"""

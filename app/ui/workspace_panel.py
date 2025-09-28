@@ -35,18 +35,13 @@ class DuplicateGroupWidget(QFrame):
                 border: 1px solid rgba(255, 255, 255, 0.1); /* 边线变为1px带透明度 */
                 border-radius: 5px;
                 padding: 8px;
-                transition: all 0.2s ease;
                 margin: 30px; /* 增加外边距 */
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* 添加投影效果 */
             }
             QFrame:hover {
                 background-color: #2D2D30;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
             }
             QFrame:selected {
                 background-color: #404040;
-                box-shadow: 0 7px 11px rgba(0, 0, 0, 0.2); /* 阴影扩大5px */
-                margin-top: 27px; /* 位置上移3px（原margin-top为30px，现为27px）*/
             }
         """)
         self.setFixedHeight(120)
@@ -123,28 +118,28 @@ class DeduplicationWorkspace(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
         
-        # 顶部操作栏
-        top_bar = QHBoxLayout()
+        # # 顶部操作栏
+        # top_bar = QHBoxLayout()
         
-        title = QLabel("🔍 重复图片结果")
-        title.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
-        top_bar.addWidget(title)
-        top_bar.addStretch()
+        # title = QLabel("🔍 重复图片结果")
+        # title.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
+        # top_bar.addWidget(title)
+        # top_bar.addStretch()
         
-        self.select_all_btn = QPushButton("全选")
-        self.select_all_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #007bff;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #0069d9;
-            }
-        """)
+        # self.select_all_btn = QPushButton("全选")
+        # self.select_all_btn.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #007bff;
+        #         color: white;
+        #         border: none;
+        #         padding: 8px 16px;
+        #         border-radius: 4px;
+        #         font-weight: bold;
+        #     }
+        #     QPushButton:hover {
+        #         background-color: #0069d9;
+        #     }
+        # """)
         self.select_all_btn.clicked.connect(self.select_all)
         top_bar.addWidget(self.select_all_btn)
         
@@ -443,35 +438,28 @@ class WorkspacePanel(QWidget):
         if module.name in self.module_workspaces:
             index = self.stacked_widget.indexOf(self.module_workspaces[module.name])
             self.stacked_widget.setCurrentIndex(index)
-            # 更新模块引用
-            if module.name == "deduplication" and isinstance(self.module_workspaces[module.name], DeduplicationWorkspace):
-                self.module_workspaces[module.name].module = module
-                self.module_workspaces[module.name].connect_signals()
+            # 更新模块引用（如果需要）
+            if module.name == "deduplication":
+                # 对于去重模块，我们让模块自己管理其工作区UI
+                pass
             return
             
         # 为模块创建工作区UI
-        if module.name == "deduplication":
-            # 特殊处理图片去重模块
-            dedup_workspace = DeduplicationWorkspace(module)
-            index = self.stacked_widget.addWidget(dedup_workspace)
-            self.module_workspaces[module.name] = dedup_workspace
+        workspace_ui = module.create_workspace_ui()
+        if workspace_ui:
+            # 添加到堆叠部件
+            index = self.stacked_widget.addWidget(workspace_ui)
+            self.module_workspaces[module.name] = workspace_ui
             self.stacked_widget.setCurrentIndex(index)
         else:
-            workspace_ui = module.create_workspace_ui()
-            if workspace_ui:
-                # 添加到堆叠部件
-                index = self.stacked_widget.addWidget(workspace_ui)
-                self.module_workspaces[module.name] = workspace_ui
-                self.stacked_widget.setCurrentIndex(index)
-            else:
-                # 如果模块没有工作区UI，显示默认消息
-                default_widget = QWidget()
-                default_layout = QVBoxLayout(default_widget)
-                label = QLabel(f"模块 '{module.display_name}' 没有可用的工作区")
-                label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                label.setStyleSheet("color: white;")
-                default_layout.addWidget(label)
-                
-                index = self.stacked_widget.addWidget(default_widget)
-                self.module_workspaces[module.name] = default_widget
-                self.stacked_widget.setCurrentIndex(index)
+            # 如果模块没有工作区UI，显示默认消息
+            default_widget = QWidget()
+            default_layout = QVBoxLayout(default_widget)
+            label = QLabel(f"模块 '{module.display_name}' 没有可用的工作区")
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setStyleSheet("color: white;")
+            default_layout.addWidget(label)
+            
+            index = self.stacked_widget.addWidget(default_widget)
+            self.module_workspaces[module.name] = default_widget
+            self.stacked_widget.setCurrentIndex(index)
