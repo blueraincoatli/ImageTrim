@@ -784,16 +784,18 @@ class DeduplicationResultsPanel(QWidget):
         self.duplicate_groups.clear()
         self.selected_files.clear()
         self.update_selection_count()
-        
+
         # 显示新结果
         duplicates = result_data.get('duplicates', {})
         if duplicates:
-            # 计算列数（根据窗口宽度动态计算，考虑卡片实际宽度）
+            # 计算列数（根据窗口宽度动态计算，确保不会溢出）
             width = self.scroll_area.viewport().width()
-            # 估算每个卡片的宽度（包括内边距、间距等）
-            # 使用3:2比例 (width: int(self.thumbnail_size * 1.5) + 边距)
-            card_width_estimate = int(self.thumbnail_size * 1.5) + 20  # 卡片总宽度估算
-            columns = max(1, width // card_width_estimate)
+            # 计算实际需要的卡片宽度（更精确的计算）
+            card_content_width = int(self.thumbnail_size * 1.5)  # 3:2比例的图片宽度
+            card_margins = 20  # 卡片内边距和边框
+            spacing = self.grid_layout.spacing()  # 网格间距
+            card_total_width = card_content_width + card_margins + spacing
+            columns = max(1, int(width // card_total_width))  # 向下取整
             
             group_items = list(duplicates.items())
             for group_idx, (primary_file, duplicate_files) in enumerate(group_items):
@@ -1010,16 +1012,18 @@ class DeduplicationResultsPanel(QWidget):
         """更新网格布局"""
         if not self.duplicate_groups:
             return
-            
+
         # 重新排列所有卡片
-        # 计算列数（根据窗口宽度动态计算，列数在1-8之间变化）
+        # 计算列数（根据窗口宽度动态计算，确保不会溢出）
         width = self.scroll_area.viewport().width()
-        # 估算每个卡片的宽度（包括边距）
-        # 使用3:2比例 (width: int(self.thumbnail_size * 1.5) + 边距)
-        card_width_estimate = int(self.thumbnail_size * 1.5) + 20  # 卡片内容宽度估算
-        
-        # 计算列数，限制在1-8之间
-        columns = max(1, min(8, width // card_width_estimate))
+        # 计算实际需要的卡片宽度（更精确的计算）
+        card_content_width = int(self.thumbnail_size * 1.5)  # 3:2比例的图片宽度
+        card_margins = 20  # 卡片内边距和边框
+        spacing = self.grid_layout.spacing()  # 网格间距
+        card_total_width = card_content_width + card_margins + spacing
+
+        # 计算列数，确保在合理范围内且不会溢出
+        columns = max(1, min(8, int(width // card_total_width)))  # 向下取整
         
         # 清除现有的行和列拉伸因子
         for i in range(self.grid_layout.rowCount()):
@@ -1042,16 +1046,26 @@ class DeduplicationResultsPanel(QWidget):
             # 添加到新位置，左对齐顶部对齐
             self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             
-        # 设置列的拉伸因子，使列宽度相等
+        # 设置列的拉伸因子，使列宽度相等且填满容器
         for i in range(columns):
             self.grid_layout.setColumnStretch(i, 1)
-            
+
         # 添加一个可伸展的空白行，确保内容从顶部开始排列并可以正常滚动
-        # 不设置行的拉伸因子，而是添加一个占位符
         rows = (len(self.duplicate_groups) + columns - 1) // columns
         if rows > 0:
             # 在最后一行添加一个伸展因子，确保可以滚动
             self.grid_layout.setRowStretch(rows, 1)
+
+        # 更新状态信息，显示当前列数和容器信息
+        if hasattr(self, 'status_label'):
+            current_status = self.status_label.text()
+            if "找到" in current_status:
+                # 保留"找到 X 组重复图片"的信息，添加布局信息
+                base_status = current_status.split('|')[0].strip()
+                self.status_label.setText(f"{base_status} | 布局: {columns}列 | 容器宽度: {width}px")
+            else:
+                # 如果没有找到重复图片的信息，只显示布局信息
+                self.status_label.setText(f"布局: {columns}列 | 容器宽度: {width}px")
 
 
 
