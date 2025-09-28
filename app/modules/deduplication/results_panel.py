@@ -494,6 +494,8 @@ class DeduplicationResultsPanel(QWidget):
         
         # 创建分割器用于结果区域和日志区域
         self.splitter = QSplitter(Qt.Orientation.Vertical)
+        # 连接分割器移动信号，以便在分割线移动时更新布局
+        self.splitter.splitterMoved.connect(self.on_splitter_moved)
         layout.addWidget(self.splitter)
         
         # 顶部操作栏
@@ -979,6 +981,14 @@ class DeduplicationResultsPanel(QWidget):
         """切换日志显示"""
         self.log_area.setVisible(self.log_btn.isChecked())
         
+    def on_splitter_moved(self, pos, index):
+        """处理分割器移动事件"""
+        try:
+            # 延迟更新布局，避免在分割器拖动过程中频繁更新
+            self.update_grid_layout()
+        except Exception as e:
+            print(f"分割器移动时出错: {str(e)}")
+
     def on_grid_size_changed(self, value):
         """处理网格列数变化"""
         self.grid_size = value
@@ -1009,64 +1019,83 @@ class DeduplicationResultsPanel(QWidget):
         
     def resizeEvent(self, event):
         """处理窗口大小调整事件"""
-        super().resizeEvent(event)
-        self.update_grid_layout()
+        try:
+            super().resizeEvent(event)
+            self.update_grid_layout()
+        except Exception as e:
+            # 捕获并记录调整大小时的错误，避免程序崩溃
+            print(f"窗口调整大小时出错: {str(e)}")
+            # 如果出错，至少确保基本布局还能工作
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("布局更新出错，请尝试重新调整窗口大小")
         
     def update_grid_layout(self):
         """更新网格布局"""
         if not self.duplicate_groups:
             return
 
-        # 使用滑块定义的列数
-        columns = self.grid_size  # 直接使用用户设置的列数
+        try:
+            # 使用滑块定义的列数
+            columns = self.grid_size  # 直接使用用户设置的列数
 
-        # 计算每列的精确宽度（容器总宽度 / 列数）
-        container_width = self.scroll_area.viewport().width()
-        column_width = container_width // columns
-        
-        # 清除现有的行和列拉伸因子
-        for i in range(self.grid_layout.rowCount()):
-            self.grid_layout.setRowStretch(i, 0)
-        for i in range(self.grid_layout.columnCount()):
-            self.grid_layout.setColumnStretch(i, 0)
-            
-        # 清除现有布局中的所有控件
-        for i in reversed(range(self.grid_layout.count())):
-            widget = self.grid_layout.itemAt(i).widget()
-            if widget:
-                self.grid_layout.removeWidget(widget)
-        
-        # 重新添加所有卡片到网格布局
-        for i, group_widget in enumerate(self.duplicate_groups):
-            # 计算新位置
-            row = i // columns
-            col = i % columns
-            
-            # 添加到新位置，左对齐顶部对齐
-            self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-            
-        # 设置每列的固定宽度，严格遵守容器宽度/列数的计算
-        for i in range(columns):
-            self.grid_layout.setColumnStretch(i, 1)
-            self.grid_layout.setColumnMinimumWidth(i, column_width)
-            self.grid_layout.setColumnMaximumWidth(i, column_width)
+            # 计算每列的精确宽度（容器总宽度 / 列数）
+            container_width = self.scroll_area.viewport().width()
+            if container_width <= 0:
+                return  # 避免除零错误
+            column_width = container_width // columns
 
-        # 添加一个可伸展的空白行，确保内容从顶部开始排列并可以正常滚动
-        rows = (len(self.duplicate_groups) + columns - 1) // columns
-        if rows > 0:
-            # 在最后一行添加一个伸展因子，确保可以滚动
-            self.grid_layout.setRowStretch(rows, 1)
+            # 清除现有的行和列拉伸因子
+            for i in range(self.grid_layout.rowCount()):
+                self.grid_layout.setRowStretch(i, 0)
+            for i in range(self.grid_layout.columnCount()):
+                self.grid_layout.setColumnStretch(i, 0)
 
-        # 更新状态信息，显示当前布局信息
-        if hasattr(self, 'status_label'):
-            current_status = self.status_label.text()
-            if "找到" in current_status:
-                # 保留"找到 X 组重复图片"的信息，更新布局信息
-                base_status = current_status.split('|')[0].strip()
-                self.status_label.setText(f"{base_status} | 布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
-            else:
-                # 如果没有找到重复图片的信息，只显示布局信息
-                self.status_label.setText(f"布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
+            # 清除现有布局中的所有控件
+            for i in reversed(range(self.grid_layout.count())):
+                widget = self.grid_layout.itemAt(i).widget()
+                if widget:
+                    self.grid_layout.removeWidget(widget)
+
+            # 重新添加所有卡片到网格布局
+            for i, group_widget in enumerate(self.duplicate_groups):
+                # 计算新位置
+                row = i // columns
+                col = i % columns
+
+                # 添加到新位置，左对齐顶部对齐
+                self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+
+            # 设置每列的固定宽度，严格遵守容器宽度/列数的计算
+            for i in range(columns):
+                self.grid_layout.setColumnStretch(i, 1)
+                self.grid_layout.setColumnMinimumWidth(i, column_width)
+
+            # 清除多余的列拉伸因子，避免影响布局
+            for i in range(columns, self.grid_layout.columnCount()):
+                self.grid_layout.setColumnStretch(i, 0)
+
+            # 添加一个可伸展的空白行，确保内容从顶部开始排列并可以正常滚动
+            rows = (len(self.duplicate_groups) + columns - 1) // columns
+            if rows > 0:
+                # 在最后一行添加一个伸展因子，确保可以滚动
+                self.grid_layout.setRowStretch(rows, 1)
+
+            # 更新状态信息，显示当前布局信息
+            if hasattr(self, 'status_label'):
+                current_status = self.status_label.text()
+                if "找到" in current_status:
+                    # 保留"找到 X 组重复图片"的信息，更新布局信息
+                    base_status = current_status.split('|')[0].strip()
+                    self.status_label.setText(f"{base_status} | 布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
+                else:
+                    # 如果没有找到重复图片的信息，只显示布局信息
+                    self.status_label.setText(f"布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
+
+        except Exception as e:
+            # 捕获并记录布局更新时的错误
+            print(f"更新网格布局时出错: {str(e)}")
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("布局更新出错，请尝试调整窗口大小或更改列数")
 
 
 
