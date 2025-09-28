@@ -790,6 +790,10 @@ class DeduplicationResultsPanel(QWidget):
         if duplicates:
             # 使用滑块定义的列数
             columns = self.grid_size  # 直接使用用户设置的列数
+
+            # 计算每列的精确宽度（容器总宽度 / 列数）
+            container_width = self.scroll_area.viewport().width()
+            column_width = container_width // columns
             
             group_items = list(duplicates.items())
             for group_idx, (primary_file, duplicate_files) in enumerate(group_items):
@@ -818,7 +822,7 @@ class DeduplicationResultsPanel(QWidget):
             for i in range(rows):
                 self.grid_layout.setRowStretch(i, 1)
                 
-            self.status_label.setText(f"找到 {len(group_items)} 组重复图片 | 布局: {columns}列 | 缩略图: {self.thumbnail_size}px")
+            self.status_label.setText(f"找到 {len(group_items)} 组重复图片 | 布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
         else:
             # 显示没有找到重复项的消息
             no_result_label = QLabel("未找到重复图片")
@@ -978,18 +982,15 @@ class DeduplicationResultsPanel(QWidget):
     def on_grid_size_changed(self, value):
         """处理网格列数变化"""
         self.grid_size = value
-        # 计算适合的缩略图大小：列数越少，缩略图越大
-        # 1列: 240px, 2列: 180px, 3列: 140px, 4列: 120px, 5-8列: 100px
-        if value == 1:
-            self.thumbnail_size = 240
-        elif value == 2:
-            self.thumbnail_size = 180
-        elif value == 3:
-            self.thumbnail_size = 140
-        elif value == 4:
-            self.thumbnail_size = 120
-        else:
-            self.thumbnail_size = 100
+
+        # 根据当前容器宽度和列数动态计算缩略图大小
+        container_width = self.scroll_area.viewport().width()
+        column_width = container_width // value
+
+        # 计算缩略图大小（考虑卡片边距和间距）
+        # 缩略图宽度 = 列宽度 - 边距 - 间距，缩略图高度 = 缩略图宽度 / 1.5 (3:2比例)
+        available_width = column_width - 30  # 减去边距和间距
+        self.thumbnail_size = max(60, int(available_width / 1.5))  # 最小60px，按3:2比例计算
 
         # 重新加载所有图片以适应新的缩略图大小
         self.update_all_thumbnails()
@@ -1018,6 +1019,10 @@ class DeduplicationResultsPanel(QWidget):
 
         # 使用滑块定义的列数
         columns = self.grid_size  # 直接使用用户设置的列数
+
+        # 计算每列的精确宽度（容器总宽度 / 列数）
+        container_width = self.scroll_area.viewport().width()
+        column_width = container_width // columns
         
         # 清除现有的行和列拉伸因子
         for i in range(self.grid_layout.rowCount()):
@@ -1040,14 +1045,11 @@ class DeduplicationResultsPanel(QWidget):
             # 添加到新位置，左对齐顶部对齐
             self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             
-        # 设置列的拉伸因子，使列宽度相等且填满容器宽度
+        # 设置每列的固定宽度，严格遵守容器宽度/列数的计算
         for i in range(columns):
             self.grid_layout.setColumnStretch(i, 1)
-
-        # 设置网格布局的列最小宽度，确保卡片不会被过度压缩
-        for i in range(columns):
-            min_column_width = int(self.thumbnail_size * 1.5) + 30  # 最小列宽度
-            self.grid_layout.setColumnMinimumWidth(i, min_column_width)
+            self.grid_layout.setColumnMinimumWidth(i, column_width)
+            self.grid_layout.setColumnMaximumWidth(i, column_width)
 
         # 添加一个可伸展的空白行，确保内容从顶部开始排列并可以正常滚动
         rows = (len(self.duplicate_groups) + columns - 1) // columns
@@ -1061,10 +1063,10 @@ class DeduplicationResultsPanel(QWidget):
             if "找到" in current_status:
                 # 保留"找到 X 组重复图片"的信息，更新布局信息
                 base_status = current_status.split('|')[0].strip()
-                self.status_label.setText(f"{base_status} | 布局: {columns}列 | 缩略图: {self.thumbnail_size}px")
+                self.status_label.setText(f"{base_status} | 布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
             else:
                 # 如果没有找到重复图片的信息，只显示布局信息
-                self.status_label.setText(f"布局: {columns}列 | 缩略图: {self.thumbnail_size}px")
+                self.status_label.setText(f"布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
 
 
 
