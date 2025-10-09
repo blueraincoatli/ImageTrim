@@ -3,9 +3,12 @@
 AVIF转换模块
 """
 
+import threading
 from core.base_module import BaseFunctionModule
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QTextEdit, QFileDialog, QLineEdit, QCheckBox, QSpinBox, QGroupBox, QComboBox
 from PyQt6.QtCore import Qt
+from .ui import AVIFConverterWorkspace
+from .logic import AVIFConverterLogic
 
 
 class AVIFConverterModule(BaseFunctionModule):
@@ -24,6 +27,12 @@ class AVIFConverterModule(BaseFunctionModule):
         self.target_path = ""
         self.quality = 85
         self.settings_ui = None
+        self.workspace_ui = None
+        self.convert_thread = None
+        self.converter_logic = AVIFConverterLogic(self)
+        
+        # 连接执行完成信号
+        self.execution_finished.connect(self.on_execution_finished)
 
     def create_settings_ui(self):
         """
@@ -123,8 +132,9 @@ class AVIFConverterModule(BaseFunctionModule):
         Returns:
             QWidget: 工作区UI面板
         """
-        # 工作区由专门的面板处理
-        return None
+        if not self.workspace_ui:
+            self.workspace_ui = AVIFConverterWorkspace(self)
+        return self.workspace_ui
 
     def browse_source(self):
         """浏览选择源路径"""
@@ -157,14 +167,19 @@ class AVIFConverterModule(BaseFunctionModule):
         self.convert_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         
-        # 执行转换（这里应该在后台线程中进行）
-        self.execute({
+        # 在后台线程中执行转换
+        params = {
             'source_path': self.source_path,
             'target_path': self.target_path,
             'quality': self.quality,
             'format': self.format_combo.currentText(),
             'include_subdirs': self.subdir_checkbox.isChecked()
-        })
+        }
+        
+        self.converter_logic.is_running = True
+        self.convert_thread = threading.Thread(target=self.converter_logic.convert_images, args=(params,))
+        self.convert_thread.daemon = True
+        self.convert_thread.start()
 
     def execute(self, params: dict):
         """
@@ -173,40 +188,33 @@ class AVIFConverterModule(BaseFunctionModule):
         Args:
             params: 执行参数
         """
-        # 这里应该实现实际的转换逻辑
-        # 为演示目的，我们只是模拟进度更新
-        self.progress_updated.emit(0, "开始转换...")
-        self.log_message.emit(f"开始转换: {params['source_path']} -> {params['target_path']}", "info")
-        
-        # 模拟转换过程
-        import time
-        for i in range(1, 101):
-            time.sleep(0.05)  # 模拟工作
-            self.progress_updated.emit(i, f"转换进度: {i}%")
-            
-        self.progress_updated.emit(100, "转换完成")
-        self.log_message.emit("转换完成", "info")
-        
-        self.execution_finished.emit({})
-        self.convert_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
+        # 这个方法现在由start_conversion调用的后台线程处理
+        pass
 
     def stop_execution(self):
         """
         停止执行
         """
+        self.converter_logic.is_running = False
         self.log_message.emit("用户停止了转换", "info")
         self.convert_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         self.progress_updated.emit(0, "已停止")
-
-    def update_progress(self, value: float, message: str):
-        """更新进度"""
-        self.progress_bar.setValue(int(value))
-        self.progress_bar.setFormat(f"{message} ({int(value)}%)")
-        self.status_label.setText(message)
-
-    def add_log_message(self, message: str, level: str):
-        """添加日志消息"""
-        formatted_message = f"[{level.upper()}] {message}"
-        self.log_text.append(formatted_message)
+        
+    def on_execution_finished(self, result_data):
+        """
+        处理执行完成事件
+        """
+        self.convert_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        
+    def on_execution_finished(self, result_data):
+        """
+        处理执行完成事件
+        """
+        self.convert_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        
+        # 如果工作区UI存在，更新其统计信息
+        if self.workspace_ui:
+            self.workspace_ui.on_execution_finished(result_data)
