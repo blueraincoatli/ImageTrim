@@ -9,6 +9,12 @@ from PIL import Image, ImageFile
 import imagehash
 import numpy as np
 
+# 尝试导入AVIF支持
+try:
+    import pillow_avif
+except ImportError:
+    pass  # 如果没有安装AVIF插件，继续运行但不支持AVIF
+
 # 设置图像加载限制，防止DOS攻击
 Image.MAX_IMAGE_PIXELS = 178956970  # 默认限制
 
@@ -30,7 +36,7 @@ class ImageUtils:
         Returns:
             List[str]: 图片文件路径列表
         """
-        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp'}
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp', '.avif'}
         image_files = []
 
         if os.path.isfile(path):
