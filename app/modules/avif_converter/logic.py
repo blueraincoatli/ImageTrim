@@ -148,6 +148,10 @@ class AVIFConverterLogic:
                     last_converted_source = file_path
                     last_converted_target = target_file
                     
+                    # 显示当前转换文件的压缩比率
+                    if hasattr(self.module, 'workspace_ui') and self.module.workspace_ui:
+                        self.module.workspace_ui.show_compression_ratio(file_path, target_file)
+                    
                     # 更新进度和统计信息
                     progress = (i + 1) / total_files * 100
                     self.module.progress_updated.emit(
@@ -161,10 +165,6 @@ class AVIFConverterLogic:
                         f"转换失败 {os.path.basename(file_path)}: {str(e)}", 
                         "error"
                     )
-            
-            # 显示最后转换文件的压缩比率
-            if last_converted_source and last_converted_target and hasattr(self.module, 'workspace_ui') and self.module.workspace_ui:
-                self.module.workspace_ui.show_compression_ratio(last_converted_source, last_converted_target)
             
             # 完成
             self.module.log_message.emit(
