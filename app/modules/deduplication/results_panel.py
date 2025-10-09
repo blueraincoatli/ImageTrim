@@ -6,13 +6,14 @@
 import os
 import shutil
 from typing import Dict, List, Tuple
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-                             QTextEdit, QScrollArea, QGridLayout, QProgressBar, 
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+                             QTextEdit, QScrollArea, QGridLayout, QProgressBar,
                              QFrame, QCheckBox, QSplitter, QFileDialog, QMessageBox,
                              QApplication, QDialog, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
                              QSlider)
-from PyQt6.QtCore import Qt, pyqtSignal, QRectF
-from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen
+from PyQt6.QtWidgets import QSizePolicy
+from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QCoreApplication
+from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen, QScreen
 from utils.image_utils import ImageUtils
 from utils.ui_helpers import UIHelpers
 
@@ -93,11 +94,27 @@ class ImageViewerDialog(QDialog):
         """加载图片"""
         try:
             # 使用PIL加载图片以支持更多格式
-            from PIL import Image
+            from PIL import Image, ImageFile
+            # 设置加载截断处理，避免因截断图像导致的错误
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
+            
             with Image.open(self.image_path) as img:
                 # 转换为RGB（处理RGBA等格式）
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
+                
+                # 检查图像尺寸是否合理
+                if img.width <= 0 or img.height <= 0:
+                    raise Exception("无效的图像尺寸")
+                
+                # 限制最大尺寸以避免内存问题
+                max_dimension = 8192
+                if img.width > max_dimension or img.height > max_dimension:
+                    # 按比例缩放
+                    ratio = min(max_dimension / img.width, max_dimension / img.height)
+                    new_width = int(img.width * ratio)
+                    new_height = int(img.height * ratio)
+                    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 
                 # 转换为QImage
                 data = img.tobytes("raw", "RGB")
@@ -121,6 +138,10 @@ class ImageViewerDialog(QDialog):
             error_msg = f"无法加载图片: {str(e)}"
             self.status_label.setText(error_msg)
             print(error_msg)
+            # 显示错误信息而不是退出程序
+            self.scene.clear()
+            error_item = self.scene.addText(error_msg, self.font())
+            error_item.setDefaultTextColor(QColor(255, 0, 0))
             
     def update_status(self, width: int, height: int, size: int):
         """更新状态信息"""
@@ -197,18 +218,17 @@ class DuplicateImageWidget(QFrame):
     selection_changed = pyqtSignal(list, bool)  # files, is_selected
     image_double_clicked = pyqtSignal(str)  # file_path
     
-    def __init__(self, file_path: str, thumbnail_size: int = 120, parent=None):
+    def __init__(self, file_path: str, width: int = 180, height: int = 120, parent=None):
         super().__init__(parent)
         self.file_path = file_path
-        self.thumbnail_size = thumbnail_size
+        self.width = width
+        self.height = height
         self.is_selected = False
         self.init_ui()
         
     def init_ui(self):
         """初始化UI"""
         # 设置样式（透明背景）
-        # 使用3:2比例 (width: int(self.thumbnail_size * 1.5), height: self.thumbnail_size)
-        self.setFixedSize(int(self.thumbnail_size * 1.5), self.thumbnail_size)
         self.setStyleSheet("""
             QFrame {
                 background-color: transparent;
@@ -216,54 +236,110 @@ class DuplicateImageWidget(QFrame):
                 border-radius: 0px;
             }
         """)
-        
+
         # 主布局（居中对齐）
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         # 创建图片标签
         self.image_label = self.create_image_label()
         layout.addWidget(self.image_label)
         
     def create_image_label(self):
-        """创建图片标签，保持原图比例，长边为缩略图大小"""
-        # 创建容器标签（居中对齐）
+        """创建图片标签，使用新的内存图片缓存系统"""
+        # 创建容器标签（完美居中显示）
         container = QLabel()
         container.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        container.setStyleSheet("background-color: transparent; border: none;")
-        # 使用3:2比例 (width: int(self.thumbnail_size * 1.5), height: self.thumbnail_size)
-        container.setFixedSize(int(self.thumbnail_size * 1.5), self.thumbnail_size)
-        
-        # 加载缩略图并保持原图比例
+        container.setStyleSheet("""
+            QLabel {
+                background-color: transparent;
+                border: none;
+                padding: 0px;
+                margin: 0px;
+                qproperty-alignment: AlignCenter;
+            }
+        """)
+
+        # 使用新的内存图片缓存系统
+        try:
+            from utils.image_cache_enhanced import get_image_cache
+            image_cache = get_image_cache()
+
+            # 获取统一缩略图
+            pixmap = image_cache.get_thumbnail_pixmap(
+                self.file_path,
+                self.width,
+                self.height
+            )
+
+            if pixmap and not pixmap.isNull():
+                # 设置缩略图并确保完美居中
+                container.setPixmap(pixmap)
+
+                # 强制重新计算布局以确保居中
+                container.update()
+                container.updateGeometry()
+            else:
+                # 显示占位符
+                container.setText("⏳")
+                container.setStyleSheet("""
+                    QLabel {
+                        color: #6c757d;
+                        font-size: 24px;
+                        background-color: #1e1e1e;
+                        border: none;
+                        padding: 0px;
+                        margin: 0px;
+                    }
+                """)
+
+                # 连接缩略图准备好信号
+                try:
+                    # 确保只连接一次信号
+                    if not hasattr(self, '_thumbnail_signal_connected'):
+                        image_cache.thumbnail_ready.connect(self._on_thumbnail_ready)
+                        self._thumbnail_signal_connected = True
+                except Exception as e:
+                    print(f"连接缩略图准备好信号失败: {e}")
+
+        except Exception as e:
+            print(f"图片缓存加载失败: {e}")
+            # 如果缓存加载失败，使用原始方法
+            return self._create_image_label_fallback(container)
+
+        return container
+
+    def _create_image_label_fallback(self, container):
+        """备用方法：直接加载图片"""
         try:
             # 获取原始图片尺寸
             from PIL import Image
             with Image.open(self.file_path) as img:
                 original_width, original_height = img.size
-                
-            # 计算缩放比例，确保图片适应3:2容器
-            container_aspect_ratio = 1.5  # 3:2
+
+            # 计算缩放比例，确保图片适应指定尺寸的容器
+            container_aspect_ratio = self.width / self.height
             image_aspect_ratio = original_width / original_height
-            
+
             if image_aspect_ratio > container_aspect_ratio:
                 # 图片更宽，以宽度为准
-                new_width = int(self.thumbnail_size * 1.5)
+                new_width = self.width
                 new_height = int(new_width / image_aspect_ratio)
             else:
                 # 图片更高，以高度为准
-                new_height = self.thumbnail_size
+                new_height = self.height
                 new_width = int(new_height * image_aspect_ratio)
-                
+
             # 限制图片最大尺寸
-            if new_width > int(self.thumbnail_size * 1.5):
-                new_width = int(self.thumbnail_size * 1.5)
-            if new_height > self.thumbnail_size:
-                new_height = self.thumbnail_size
-                
+            if new_width > self.width:
+                new_width = self.width
+            if new_height > self.height:
+                new_height = self.height
+
             container.setFixedSize(new_width, new_height)
-            
+
             # 获取缩略图
             thumbnail = ImageUtils.get_thumbnail(self.file_path, (new_width, new_height))
             # 将PIL图像转换为QImage
@@ -275,10 +351,54 @@ class DuplicateImageWidget(QFrame):
         except Exception as e:
             # 如果加载失败，显示错误图标
             container.setText("🚫")
-            container.setFixedSize(int(self.thumbnail_size * 1.5), self.thumbnail_size)
+            container.setFixedSize(self.width, self.height)
             container.setStyleSheet("color: #dc3545; font-size: 24px; background-color: transparent; border: none;")
-            
+
         return container
+
+    def _on_thumbnail_ready(self, file_path, pixmap):
+        """缩略图准备好时的回调"""
+        if file_path == self.file_path and hasattr(self, 'image_label'):
+            try:
+                # 缓存系统已经提供了正确尺寸的缩略图，直接设置
+                if pixmap and not pixmap.isNull():
+                    # 按宽度缩放图片，保持原始宽高比
+                    scaled_pixmap = pixmap.scaledToWidth(
+                        self.width,
+                        Qt.TransformationMode.SmoothTransformation
+                    )
+                    self.image_label.setPixmap(scaled_pixmap)
+                else:
+                    # 如果缩略图为空，显示占位符
+                    self.image_label.setText("⏳")
+                    self.image_label.setStyleSheet("""
+                        QLabel {
+                            color: #6c757d;
+                            font-size: 24px;
+                            background-color: transparent;
+                            border: none;
+                            padding: 0px;
+                            margin: 0px;
+                        }
+                    """)
+            except Exception as e:
+                print(f"设置缩略图时出错: {e}")
+                # 显示错误占位符
+                self.image_label.setText("🚫")
+                self.image_label.setStyleSheet("""
+                    QLabel {
+                        color: #dc3545;
+                        font-size: 24px;
+                        background-color: transparent;
+                        border: none;
+                        padding: 0px;
+                        margin: 0px;
+                    }
+                """)
+
+            # 强制重新计算布局以确保完美居中
+            self.image_label.update()
+            self.image_label.updateGeometry()
         
     def mousePressEvent(self, event):
         """处理鼠标点击事件"""
@@ -315,159 +435,108 @@ class DuplicateGroupWidget(QFrame):
         self.confidence = confidence
         self.is_selected = False
         self.image_widgets = []  # 存储图片控件
+        self.images_layout = None
+        self.card_height = 0  # 卡片高度
         self.init_ui()
-        
-    def update_thumbnails(self, thumbnail_size: int):
-        """更新缩略图大小"""
-        # 更新缩略图大小属性
-        self.thumbnail_size = thumbnail_size
-        
-        # 清除现有的图片控件
-        for widget in self.image_widgets:
-            widget.setParent(None)
-        self.image_widgets.clear()
-        
-        # 找到图片容器布局并清除其中的所有控件
-        layout = self.layout()
-        if layout is not None and layout.count() > 0:
-            # 获取图片容器（最后一个添加的widget）
-            images_container_item = layout.itemAt(layout.count() - 1)
-            if images_container_item and images_container_item.widget():
-                images_container = images_container_item.widget()
-                images_layout = images_container.layout()
-                if images_layout:
-                    # 清除现有布局中的所有控件
-                    for i in reversed(range(images_layout.count())):
-                        item = images_layout.itemAt(i)
-                        if item and item.widget():
-                            item.widget().setParent(None)
-                    
-                    # 重新创建图片控件
-                    for file_path in self.files:
-                        image_widget = DuplicateImageWidget(file_path, self.thumbnail_size)
-                        image_widget.selection_changed.connect(self.on_image_selection_changed)
-                        image_widget.image_double_clicked.connect(self.image_double_clicked.emit)
-                        images_layout.addWidget(image_widget)
-                        self.image_widgets.append(image_widget)
         
     def init_ui(self):
         """初始化UI"""
-        # 设置卡片样式（减小内边距）
         self.setStyleSheet("""
             QFrame {
                 background-color: #1B1B1B;
                 border: 1px solid #353535;
                 border-radius: 8px;
-                padding: 5px;
             }
             QFrame:hover {
                 background-color: #252525;
             }
         """)
         
-        # 主布局
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # 直接创建卡片图片区域（移除了头部信息）
-        self.create_card_images(layout)
-        
-    def create_card_header(self, parent_layout):
-        """创建卡片头部（已移除）"""
-        # 已根据要求移除卡片头部信息
-        pass
-        
-    def create_card_images(self, parent_layout):
-        """创建卡片图片区域"""
-        # 清除现有的图片容器（如果存在）
-        for i in reversed(range(parent_layout.count())):
-            item = parent_layout.itemAt(i)
-            if item and item.widget():
-                widget = item.widget()
-                if isinstance(widget, QFrame):
-                    layout = widget.layout()
-                    if layout and isinstance(layout, QHBoxLayout):
-                        # 清除布局中的所有控件
-                        for j in reversed(range(layout.count())):
-                            layout_item = layout.itemAt(j)
-                            if layout_item and layout_item.widget():
-                                layout_item.widget().setParent(None)
-                        # 删除布局
-                        widget.setLayout(None)
-                        # 删除容器
-                        widget.setParent(None)
-        
-        # 创建新的图片容器
         images_container = QFrame()
         images_container.setStyleSheet("background-color: transparent; border: none;")
-        images_layout = QHBoxLayout(images_container)
-        images_layout.setContentsMargins(2, 2, 2, 2)
-        images_layout.setSpacing(5)
-        images_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.images_layout = QHBoxLayout(images_container)
+        self.images_layout.setContentsMargins(0, 0, 0, 0)
+        self.images_layout.setSpacing(0)
+        main_layout.addWidget(images_container)
+
+    def update_thumbnails(self, card_width: int):
+        """更新缩略图大小"""
+        # 设置卡片固定宽高比 (宽度:高度 = 2:1)
+        self.card_height = int(card_width / 2)
+        self.setFixedHeight(self.card_height)
         
-        # 创建图片控件
-        self.image_widgets = []
+        # 计算内边距和间距
+        padding = int(self.card_height / 6)  # 内边距为卡片高度的1/6
+        spacing = int(self.card_height / 12)  # 图片间距为卡片高度的1/12
+        
+        # 设置图片布局的边距
+        self.images_layout.setContentsMargins(padding, padding, padding, padding)
+        self.images_layout.setSpacing(spacing)
+        
+        # 清除现有内容
+        for widget in self.image_widgets:
+            widget.setParent(None)
+        self.image_widgets.clear()
+        
+        while self.images_layout.count():
+            child = self.images_layout.takeAt(0)
+            if child.widget():
+                child.widget().setParent(None)
+
+        # 计算每张图片的可用空间
+        if len(self.files) > 0:
+            # 可用宽度 = 卡片宽度 - 2*内边距 - (图片数量-1)*间距
+            available_width = card_width - 2 * padding - (len(self.files) - 1) * spacing
+            # 每张图片的平均宽度
+            image_width = int(available_width / len(self.files))
+            # 图片高度应该根据卡片高度和内边距计算，留出一些额外空间
+            image_height = self.card_height - 2 * padding - 10  # 减去一些额外空间确保图片不会超出边界
+            # 确保图片高度不为负数
+            image_height = max(50, image_height)  # 最小高度为50像素
+        else:
+            image_width = 100  # 默认宽度
+            image_height = 50  # 默认高度
+            
+        # 重新添加控件
         for file_path in self.files:
-            image_widget = DuplicateImageWidget(file_path, self.thumbnail_size if hasattr(self, "thumbnail_size") else 120)
+            image_widget = DuplicateImageWidget(file_path, image_width, image_height)
             image_widget.selection_changed.connect(self.on_image_selection_changed)
             image_widget.image_double_clicked.connect(self.image_double_clicked.emit)
-            images_layout.addWidget(image_widget)
+            self.images_layout.addWidget(image_widget)
             self.image_widgets.append(image_widget)
-            
-        images_layout.addStretch()
-        parent_layout.addWidget(images_container)
-        
-    def on_checkbox_changed(self, state):
-        """处理复选框变化"""
-        is_checked = state == Qt.CheckState.Checked.value
-        self.set_selected(is_checked)
         
     def on_image_selection_changed(self, files, is_selected):
         """处理图片选择变化"""
-        # 发出信号
         self.selection_changed.emit(self.files, is_selected)
         
     def set_selected(self, selected):
         """设置选中状态"""
         self.is_selected = selected
-            
-        # 更新样式 - 实现上浮效果和发光效果
         if selected:
-            self.setProperty("selected", True)
-            # 上浮效果：改变背景色，向上移动3px
-            # 使用较宽的浅色边框模拟发光效果
             self.setStyleSheet("""
                 QFrame {
-                    background-color: #2D2D30;
-                    border: 3px solid rgba(173, 216, 230, 0.7);  /* 浅蓝色边框模拟发光 */
+                    background-color: #2a2a2e;
+                    border: 2px solid #FF8C00;
                     border-radius: 8px;
-                    padding: 5px;
                 }
             """)
-            # 向上移动3px实现上浮效果
-            self.move(self.x(), self.y() - 3)
         else:
-            self.setProperty("selected", False)
-            # 恢复原来的样式
             self.setStyleSheet("""
                 QFrame {
                     background-color: #1B1B1B;
                     border: 1px solid #353535;
                     border-radius: 8px;
-                    padding: 5px;
+                }
+                QFrame:hover {
+                    background-color: #252525;
                 }
             """)
-            # 恢复原来的位置
-            self.move(self.x(), self.y() + 3)
         self.style().unpolish(self)
         self.style().polish(self)
-        
-        # 更新所有图片控件的选中状态（但不改变它们的视觉效果）
-        for widget in self.image_widgets:
-            widget.is_selected = selected
-        
-        # 发出信号
         self.selection_changed.emit(self.files, selected)
 
 
@@ -481,10 +550,35 @@ class DeduplicationResultsPanel(QWidget):
         self.module = module
         self.duplicate_groups = []  # 存储所有重复组控件
         self.selected_files = set()  # 存储选中的文件
-        self.grid_size = 5  # 网格大小等级 (1-10)
+        self.grid_size = 3  # 网格列数 (1-8)
         self.thumbnail_size = 120  # 缩略图大小
+
+        # 获取DPI缩放因子
+        self.dpi_scale_factor = self.get_dpi_scale_factor()
+        print(f"DPI调试: 初始化DPI缩放因子 = {self.dpi_scale_factor}")
+
         self.init_ui()
         self.connect_signals()
+
+    def get_dpi_scale_factor(self):
+        """获取DPI缩放因子"""
+        try:
+            # 获取主屏幕
+            screen = QCoreApplication.instance().primaryScreen()
+            if screen:
+                # 获取逻辑DPI和物理DPI
+                logical_dpi = screen.logicalDotsPerInch()
+                physical_dpi = screen.physicalDotsPerInch()
+                # 计算缩放因子
+                scale_factor = logical_dpi / 96.0  # 96是标准DPI
+                print(f"DPI调试: 逻辑DPI={logical_dpi}, 物理DPI={physical_dpi}, 缩放因子={scale_factor}")
+                return scale_factor
+        except Exception as e:
+            print(f"获取DPI缩放因子时出错: {str(e)}")
+
+        # 如果无法获取，使用默认值
+        print("DPI调试: 无法获取DPI信息，使用默认缩放因子1.0")
+        return 1.0
         
     def init_ui(self):
         """初始化UI"""
@@ -621,28 +715,69 @@ class DeduplicationResultsPanel(QWidget):
         self.grid_size_slider = QSlider(Qt.Orientation.Horizontal)
         self.grid_size_slider.setRange(1, 8)  # 1-8列
         self.grid_size_slider.setValue(3)  # 默认3列，更适合大多数屏幕
-        self.grid_size_slider.setFixedWidth(100)
+        self.grid_size_slider.setFixedWidth(120)
         self.grid_size_slider.setStyleSheet("""
             QSlider::groove:horizontal {
-                border: 1px solid #999999;
-                height: 8px;
-                background: #2B2B2B;
+                border: none;
+                height: 6px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                         stop:0 #404040, stop:1 #2a2a2a);
                 margin: 2px 0;
-            }
-            QSlider::handle:horizontal {
-                background: #FF8C00;
-                border: 1px solid #5c5c5c;
-                width: 18px;
-                margin: -2px 0;
                 border-radius: 3px;
             }
+            QSlider::handle:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                         stop:0 #FF8C00, stop:0.5 #FF6B35, stop:1 #FF8C00);
+                border: 2px solid #ffffff;
+                width: 20px;
+                margin: -8px 0;
+                border-radius: 10px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
+            QSlider::handle:horizontal:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                         stop:0 #FFA500, stop:0.5 #FF8C00, stop:1 #FFA500);
+                border: 2px solid #ffffff;
+                box-shadow: 0 4px 8px rgba(255,140,0,0.4);
+                transform: scale(1.1);
+            }
+            QSlider::handle:horizontal:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                         stop:0 #FF6B35, stop:0.5 #FF4500, stop:1 #FF6B35);
+                border: 2px solid #ffffff;
+                box-shadow: 0 2px 6px rgba(255,140,0,0.6);
+                transform: scale(0.95);
+            }
             QSlider::sub-page:horizontal {
-                background: #FF8C00;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                         stop:0 #FF8C00, stop:0.5 #FF6B35, stop:1 #FF8C00);
+                border-radius: 3px;
+                margin: 2px 0;
+            }
+            QSlider::add-page:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                         stop:0 #404040, stop:1 #2a2a2a);
+                border-radius: 3px;
+                margin: 2px 0;
             }
         """)
         self.grid_size_slider.valueChanged.connect(self.on_grid_size_changed)
         top_layout.addWidget(self.grid_size_slider)
-        
+
+        # 显示当前列数的标签
+        self.grid_size_value_label = QLabel("3")
+        self.grid_size_value_label.setStyleSheet("""
+            color: #FF8C00;
+            font-weight: bold;
+            font-size: 14px;
+            min-width: 20px;
+            padding: 2px 6px;
+            background: rgba(255, 140, 0, 0.1);
+            border: 1px solid rgba(255, 140, 0, 0.3);
+            border-radius: 4px;
+        """)
+        top_layout.addWidget(self.grid_size_value_label)
+
         # 进度条
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -753,6 +888,39 @@ class DeduplicationResultsPanel(QWidget):
             self.module.progress_updated.connect(self.update_progress)
             self.module.log_message.connect(self.add_log_message)
             self.module.execution_finished.connect(self.show_results)
+
+        # 延迟执行一次布局更新，确保窗口已经完全显示
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, self.delayed_layout_update)
+
+    def force_thumbnail_refresh(self):
+        """强制刷新缩略图显示"""
+        try:
+            if hasattr(self, 'duplicate_groups') and self.duplicate_groups:
+                print(f"强制刷新 {len(self.duplicate_groups)} 个重复组的缩略图")
+                # 重新计算当前列宽并刷新所有缩略图
+                columns = self.grid_size
+                container_width = self.scroll_area.viewport().width()
+                if container_width > 0:
+                    column_width = container_width // columns
+
+                    for group_widget in self.duplicate_groups:
+                        if hasattr(group_widget, 'files') and group_widget.files:
+                            self.update_group_widget_size(group_widget, column_width)
+
+                    # 强制UI更新
+                    self.scroll_area.viewport().update()
+                    
+                    # 触发所有缩略图重新加载
+                    self.reload_all_thumbnails()
+        except Exception as e:
+            print(f"强制刷新缩略图时出错: {e}")
+
+    def delayed_layout_update(self):
+        """延迟布局更新，确保窗口已经完全显示"""
+        if hasattr(self, 'grid_layout') and self.grid_layout:
+            print("DPI调试: 执行延迟布局更新")
+            self.update_grid_layout()
             
     def update_progress(self, value: float, message: str):
         """更新进度"""
@@ -814,6 +982,10 @@ class DeduplicationResultsPanel(QWidget):
                 group_widget.image_double_clicked.connect(self.on_image_double_clicked)
                 self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignCenter)
                 self.duplicate_groups.append(group_widget)
+
+                # 立即设置正确的图片尺寸（关键修复！）
+                if hasattr(self, 'scroll_area') and self.scroll_area:
+                    self.update_group_widget_size(group_widget, column_width)
                 
             # 设置列的拉伸因子，使列宽度相等
             for i in range(columns):
@@ -825,6 +997,13 @@ class DeduplicationResultsPanel(QWidget):
                 self.grid_layout.setRowStretch(i, 1)
                 
             self.status_label.setText(f"找到 {len(group_items)} 组重复图片 | 布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
+
+            # 强制刷新布局和缩略图显示（修复自动刷新问题）
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, self.force_thumbnail_refresh)
+            
+            # 再次刷新以确保所有缩略图都加载完成
+            QTimer.singleShot(500, self.force_thumbnail_refresh)
         else:
             # 显示没有找到重复项的消息
             no_result_label = QLabel("未找到重复图片")
@@ -993,29 +1172,24 @@ class DeduplicationResultsPanel(QWidget):
         """处理网格列数变化"""
         self.grid_size = value
 
-        # 根据当前容器宽度和列数动态计算缩略图大小
-        container_width = self.scroll_area.viewport().width()
-        column_width = container_width // value
+        # 更新显示当前列数的标签
+        if hasattr(self, 'grid_size_value_label'):
+            self.grid_size_value_label.setText(str(value))
 
-        # 计算缩略图大小（考虑卡片边距和间距）
-        # 缩略图宽度 = 列宽度 - 边距 - 间距，缩略图高度 = 缩略图宽度 / 1.5 (3:2比例)
-        available_width = column_width - 30  # 减去边距和间距
-        self.thumbnail_size = max(60, int(available_width / 1.5))  # 最小60px，按3:2比例计算
-
-        # 重新加载所有图片以适应新的缩略图大小
-        self.update_all_thumbnails()
-
-        # 重新布局网格
+        # 重新布局网格，这会更新每个重复组卡片的宽度
         self.update_grid_layout()
         
-    def update_all_thumbnails(self):
-        """更新所有缩略图大小"""
-        # 更新所有组的缩略图大小
-        for group_widget in self.duplicate_groups:
-            # 更新组控件的缩略图大小属性
-            group_widget.thumbnail_size = self.thumbnail_size
-            # 重新创建图片控件
-            group_widget.update_thumbnails(self.thumbnail_size)
+        # 延迟刷新缩略图以确保布局已经更新
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(50, self.force_thumbnail_refresh)
+
+    def update_group_widget_size(self, group_widget, column_width):
+        """更新重复组卡片的尺寸和内部缩略图大小"""
+        # 直接传递卡片宽度给update_thumbnails方法
+        # DuplicateGroupWidget会根据固定宽高比自动计算高度
+        group_widget.update_thumbnails(column_width)
+
+    # update_all_thumbnails方法已移除，因为现在通过update_grid_layout和update_group_widget_size来处理
         
     def resizeEvent(self, event):
         """处理窗口大小调整事件"""
@@ -1029,6 +1203,22 @@ class DeduplicationResultsPanel(QWidget):
             if hasattr(self, 'status_label'):
                 self.status_label.setText("布局更新出错，请尝试重新调整窗口大小")
         
+    def reload_all_thumbnails(self):
+        """重新加载所有缩略图"""
+        try:
+            # 通过更新整个网格布局来重新加载所有缩略图
+            # 这会重新创建所有图片控件，从而触发缩略图的重新加载
+            self.update_grid_layout()
+            
+            # 额外触发一次缓存刷新
+            from utils.image_cache_enhanced import get_image_cache
+            image_cache = get_image_cache()
+            
+            # 清理缓存并重新生成
+            image_cache.clear_cache()
+        except Exception as e:
+            print(f"重新加载缩略图时出错: {e}")
+
     def update_grid_layout(self):
         """更新网格布局"""
         if not self.duplicate_groups:
@@ -1038,11 +1228,53 @@ class DeduplicationResultsPanel(QWidget):
             # 使用滑块定义的列数
             columns = self.grid_size  # 直接使用用户设置的列数
 
-            # 计算每列的精确宽度（容器总宽度 / 列数）
+            # 获取容器宽度和网格布局参数
             container_width = self.scroll_area.viewport().width()
             if container_width <= 0:
                 return  # 避免除零错误
-            column_width = container_width // columns
+
+            # 获取网格布局的间距和边距
+            grid_spacing = self.grid_layout.spacing()  # 网格间距（默认10px）
+            margins = self.grid_layout.contentsMargins()
+            left_margin = margins.left()
+            right_margin = margins.right()
+            top_margin = margins.top()
+            bottom_margin = margins.bottom()
+            total_horizontal_margin = left_margin + right_margin
+            total_spacing_width = grid_spacing * (columns - 1)  # 列间距总数
+
+            # 考虑DPI缩放因子调整容器宽度
+            scaled_container_width = int(container_width / self.dpi_scale_factor)
+
+            # 计算实际可用的宽度（容器宽度 - 边距 - 间距）
+            available_width = scaled_container_width - total_horizontal_margin - total_spacing_width
+
+            # 计算每列的实际可用宽度
+            if available_width <= 0:
+                print(f"DPI调试: 警告 - 可用宽度为负数或零: available_width={available_width}, 跳过布局更新")
+                return  # 避免负数或零宽度
+
+            # 确保最小列宽
+            min_column_width = 100  # 最小列宽100px
+            if available_width < columns * min_column_width:
+                print(f"DPI调试: 警告 - 可用宽度不足以显示{columns}列, 最小需要{columns * min_column_width}px, 实际{available_width}px")
+                # 自动减少列数以适应可用宽度
+                columns = max(1, available_width // min_column_width)
+                total_spacing_width = grid_spacing * (columns - 1)
+                available_width = scaled_container_width - total_horizontal_margin - total_spacing_width
+                print(f"DPI调试: 自动调整列数为{columns}, 新的可用宽度={available_width}px")
+
+            actual_column_width = available_width // columns
+
+            # 为了显示实际值，我们也保存原始逻辑宽度
+            logical_container_width = container_width
+            logical_available_width = logical_container_width - total_horizontal_margin - total_spacing_width
+            logical_column_width = logical_available_width // columns
+
+            print(f"DPI调试: 更新布局 - 列数={columns}, 容器宽度={container_width}, 缩放容器宽度={scaled_container_width}")
+            print(f"DPI调试: 网格参数 - 左边距={left_margin}px, 右边距={right_margin}px, 总边距={total_horizontal_margin}px, 网格间距={grid_spacing}px, 总间距={total_spacing_width}px")
+            print(f"DPI调试: 可用宽度 - 缩放可用={available_width}px, 逻辑可用={logical_available_width}px")
+            print(f"DPI调试: 最终列宽 - 缩放列宽={actual_column_width}px, 逻辑列宽={logical_column_width}px, DPI缩放因子={self.dpi_scale_factor}")
 
             # 清除现有的行和列拉伸因子
             for i in range(self.grid_layout.rowCount()):
@@ -1056,19 +1288,22 @@ class DeduplicationResultsPanel(QWidget):
                 if widget:
                     self.grid_layout.removeWidget(widget)
 
-            # 重新添加所有卡片到网格布局
+            # 重新添加所有卡片到网格布局，并更新每个卡片的尺寸
             for i, group_widget in enumerate(self.duplicate_groups):
                 # 计算新位置
                 row = i // columns
                 col = i % columns
 
-                # 添加到新位置，左对齐顶部对齐
-                self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+                # 添加到新位置，居中对齐
+                self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignCenter)
 
-            # 设置每列的固定宽度，严格遵守容器宽度/列数的计算
+                # 更新这个重复组卡片的宽度并重新计算内部图片大小
+                self.update_group_widget_size(group_widget, actual_column_width)
+
+            # 设置每列的固定宽度，使用实际计算的列宽
             for i in range(columns):
                 self.grid_layout.setColumnStretch(i, 1)
-                self.grid_layout.setColumnMinimumWidth(i, column_width)
+                self.grid_layout.setColumnMinimumWidth(i, actual_column_width)
 
             # 清除多余的列拉伸因子，避免影响布局
             for i in range(columns, self.grid_layout.columnCount()):
@@ -1086,10 +1321,16 @@ class DeduplicationResultsPanel(QWidget):
                 if "找到" in current_status:
                     # 保留"找到 X 组重复图片"的信息，更新布局信息
                     base_status = current_status.split('|')[0].strip()
-                    self.status_label.setText(f"{base_status} | 布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
+                    if self.dpi_scale_factor != 1.0:
+                        self.status_label.setText(f"{base_status} | 布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px | DPI缩放: {self.dpi_scale_factor:.2f}x")
+                    else:
+                        self.status_label.setText(f"{base_status} | 布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px")
                 else:
                     # 如果没有找到重复图片的信息，只显示布局信息
-                    self.status_label.setText(f"布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
+                    if self.dpi_scale_factor != 1.0:
+                        self.status_label.setText(f"布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px | DPI缩放: {self.dpi_scale_factor:.2f}x")
+                    else:
+                        self.status_label.setText(f"布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px")
 
         except Exception as e:
             # 捕获并记录布局更新时的错误
