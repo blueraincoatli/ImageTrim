@@ -3,13 +3,113 @@
 图片去重模块
 """
 
+import threading
 from core.base_module import BaseFunctionModule
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
                              QProgressBar, QFileDialog, QLineEdit, QCheckBox, QSpinBox, 
                              QGroupBox, QListWidget, QStackedWidget)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
 from utils.image_utils import ImageUtils
 import os
+
+
+class DeduplicationWorker(QObject):
+    """
+    图片去重扫描工作线程
+    """
+    
+    # 定义信号
+    progress_updated = pyqtSignal(float, str)
+    log_message = pyqtSignal(str, str)
+    finished = pyqtSignal(dict)
+    
+    def __init__(self):
+        super().__init__()
+        self.is_running = False
+        
+    def stop(self):
+        """停止扫描"""
+        self.is_running = False
+        
+    def scan_duplicates(self, params):
+        """执行扫描操作"""
+        self.is_running = True
+        
+        try:
+            # 收集所有图片文件
+            self.progress_updated.emit(0, "收集图片文件...")
+            self.log_message.emit(f"开始扫描 {len(params['paths'])} 个路径", "info")
+            
+            all_image_files = []
+            total_files_found = 0
+            
+            # 收集文件，同时更新进度
+            for i, path in enumerate(params['paths']):
+                if not self.is_running:
+                    break
+                    
+                if os.path.exists(path):
+                    image_files = ImageUtils.get_image_files(path, params['include_subdirs'])
+                    all_image_files.extend(image_files)
+                    total_files_found += len(image_files)
+                    
+                    # 更新收集文件进度
+                    progress = (i + 1) / len(params['paths']) * 30  # 收集文件占30%进度
+                    self.progress_updated.emit(progress, f"收集图片文件... {i+1}/{len(params['paths'])}")
+                    self.log_message.emit(f"从 {path} 找到 {len(image_files)} 个图片文件", "info")
+                else:
+                    self.log_message.emit(f"路径不存在: {path}", "error")
+            
+            if not self.is_running:
+                return
+                
+            total_files = len(all_image_files)
+            if total_files == 0:
+                self.log_message.emit("未找到任何图片文件", "warning")
+                self.progress_updated.emit(100, "扫描完成")
+                self.finished.emit({})
+                return
+            
+            self.log_message.emit(f"总共找到 {total_files} 个图片文件", "info")
+            
+            # 计算哈希值并查找重复项
+            self.progress_updated.emit(40, "计算图片哈希值...")
+            duplicates = ImageUtils.find_duplicates(
+                all_image_files, 
+                params['threshold'] / 100.0
+            )
+            
+            if not self.is_running:
+                return
+            
+            # 报告结果
+            self.progress_updated.emit(100, "扫描完成")
+            if duplicates:
+                total_groups = len(duplicates)
+                total_duplicates = sum(len(files) for files in duplicates.values())
+                self.log_message.emit(f"找到 {total_groups} 组重复图片，共 {total_duplicates} 个重复文件", "info")
+                
+                # 发送结果到工作区
+                result_data = {
+                    'duplicates': duplicates,
+                    'total_files': total_files,
+                    'total_groups': total_groups,
+                    'total_duplicates': total_duplicates
+                }
+                self.finished.emit(result_data)
+            else:
+                self.log_message.emit("未找到重复图片", "info")
+                self.finished.emit({
+                    'duplicates': {},
+                    'total_files': total_files,
+                    'total_groups': 0,
+                    'total_duplicates': 0
+                })
+                
+        except Exception as e:
+            self.log_message.emit(f"扫描过程中出错: {str(e)}", "error")
+            self.progress_updated.emit(100, "扫描出错")
+            self.finished.emit({})
 
 
 class DeduplicationModule(BaseFunctionModule):
@@ -28,6 +128,8 @@ class DeduplicationModule(BaseFunctionModule):
         self.similarity_threshold = 95
         self.settings_ui = None
         self.workspace_ui = None
+        self.scan_thread = None
+        self.scan_worker = None
 
     def create_settings_ui(self):
         """
@@ -210,120 +312,48 @@ class DeduplicationModule(BaseFunctionModule):
         if hasattr(self, "workspace_stacked_widget"):
             self.workspace_stacked_widget.setCurrentIndex(1)
         
-        # 执行扫描（这里应该在后台线程中进行）
-        self.execute({
+        # 创建工作线程
+        self.scan_thread = QThread()
+        self.scan_worker = DeduplicationWorker()
+        self.scan_worker.moveToThread(self.scan_thread)
+        
+        # 连接信号
+        self.scan_worker.progress_updated.connect(self.progress_updated.emit)
+        self.scan_worker.log_message.connect(self.log_message.emit)
+        self.scan_worker.finished.connect(self.on_scan_finished)
+        self.scan_thread.started.connect(lambda: self.scan_worker.scan_duplicates({
             'paths': self.scan_paths,
             'threshold': self.similarity_threshold,
             'include_subdirs': self.subdir_checkbox.isChecked()
-        })
+        }))
+        
+        # 启动线程
+        self.scan_thread.start()
 
     def execute(self, params: dict):
         """
-        执行去重操作
+        执行去重操作（现在由工作线程处理）
 
         Args:
             params: 执行参数
         """
-        try:
-            # 收集所有图片文件
-            self.progress_updated.emit(0, "收集图片文件...")
-            self.log_message.emit(f"开始扫描 {len(params['paths'])} 个路径", "info")
-            
-            all_image_files = []
-            for path in params['paths']:
-                if os.path.exists(path):
-                    image_files = ImageUtils.get_image_files(path, params['include_subdirs'])
-                    all_image_files.extend(image_files)
-                    self.log_message.emit(f"从 {path} 找到 {len(image_files)} 个图片文件", "info")
-                else:
-                    self.log_message.emit(f"路径不存在: {path}", "error")
-            
-            total_files = len(all_image_files)
-            if total_files == 0:
-                self.log_message.emit("未找到任何图片文件", "warning")
-                self.progress_updated.emit(100, "扫描完成")
-                self.is_scanning = False
-                self.scan_stop_btn.setText("🔍 开始扫描")
-                self.scan_stop_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #3A3A3A;
-                        color: white;
-                        border: 1px solid #4C4C4C;
-                        padding: 6px 12px;
-                        border-radius: 4px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #4A4A4A;
-                        color: #FF8C00;
-                    }
-                    QPushButton:pressed {
-                        background-color: #333333;
-                        color: #FF8C00;
-                    }
-                    QPushButton:disabled {
-                        background-color: #555555;
-                        color: #A0A0A0;
-                    }
-                """)
-                
-                # 如果没有找到文件，切换回拖拽区域
-                if hasattr(self, "workspace_stacked_widget"):
-                    self.workspace_stacked_widget.setCurrentIndex(0)
-                return
-            
-            self.log_message.emit(f"总共找到 {total_files} 个图片文件", "info")
-            
-            # 计算哈希值并查找重复项
-            self.progress_updated.emit(10, "计算图片哈希值...")
-            duplicates = ImageUtils.find_duplicates(
-                all_image_files, 
-                params['threshold'] / 100.0
-            )
-            
-            # 报告结果
-            self.progress_updated.emit(100, "扫描完成")
-            if duplicates:
-                total_groups = len(duplicates)
-                total_duplicates = sum(len(files) for files in duplicates.values())
-                self.log_message.emit(f"找到 {total_groups} 组重复图片，共 {total_duplicates} 个重复文件", "info")
-                
-                # 发送结果到工作区
-                result_data = {
-                    'duplicates': duplicates,
-                    'total_files': total_files,
-                    'total_groups': total_groups,
-                    'total_duplicates': total_duplicates
-                }
-                self.execution_finished.emit(result_data)
-            else:
-                self.log_message.emit("未找到重复图片", "info")
-                self.execution_finished.emit({
-                    'duplicates': {},
-                    'total_files': total_files,
-                    'total_groups': 0,
-                    'total_duplicates': 0
-                })
-                
-                # 如果没有找到重复图片，切换回拖拽区域
-                if hasattr(self, "workspace_stacked_widget"):
-                    self.workspace_stacked_widget.setCurrentIndex(0)
-                
-        except Exception as e:
-            self.log_message.emit(f"扫描过程中出错: {str(e)}", "error")
-            self.progress_updated.emit(100, "扫描出错")
-            
-            # 出错时切换回拖拽区域
-            if hasattr(self, "workspace_stacked_widget"):
-                self.workspace_stacked_widget.setCurrentIndex(0)
-            
-        # 这里不需要设置按钮状态，因为已经统一使用 scan_stop_btn
+        # 这个方法现在由工作线程处理
+        pass
 
     def stop_execution(self):
         """
         停止执行
         """
         self.log_message.emit("用户停止了扫描", "info")
+        
+        # 停止工作线程
+        if self.scan_worker:
+            self.scan_worker.stop()
+        
+        if self.scan_thread and self.scan_thread.isRunning():
+            self.scan_thread.quit()
+            self.scan_thread.wait(3000)  # 等待3秒
+        
         self.is_scanning = False
         self.scan_stop_btn.setText("🔍 开始扫描")
         self.scan_stop_btn.setStyleSheet("""
@@ -353,6 +383,50 @@ class DeduplicationModule(BaseFunctionModule):
         # 切换回拖拽区域
         if hasattr(self, "workspace_stacked_widget"):
             self.workspace_stacked_widget.setCurrentIndex(0)
+    
+    def on_scan_finished(self, result_data):
+        """
+        扫描完成处理
+        """
+        self.is_scanning = False
+        self.scan_stop_btn.setText("🔍 开始扫描")
+        self.scan_stop_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3A3A3A;
+                color: white;
+                border: 1px solid #4C4C4C;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+                color: #FF8C00;
+            }
+            QPushButton:pressed {
+                background-color: #333333;
+                color: #FF8C00;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #A0A0A0;
+            }
+        """)
+        
+        # 清理线程资源
+        if self.scan_thread:
+            self.scan_thread.quit()
+            self.scan_thread.wait()
+            self.scan_thread = None
+            self.scan_worker = None
+        
+        # 发送结果到工作区
+        self.execution_finished.emit(result_data)
+        
+        # 如果没有找到重复图片，切换回拖拽区域
+        if not result_data.get('duplicates'):
+            if hasattr(self, "workspace_stacked_widget"):
+                self.workspace_stacked_widget.setCurrentIndex(0)
             
     def on_paths_dropped(self, paths):
         """
