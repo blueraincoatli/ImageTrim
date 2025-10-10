@@ -6,7 +6,7 @@
 from core.base_module import BaseFunctionModule
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
                              QProgressBar, QFileDialog, QLineEdit, QCheckBox, QSpinBox, 
-                             QGroupBox, QListWidget)
+                             QGroupBox, QListWidget, QStackedWidget)
 from PyQt6.QtCore import Qt
 from utils.image_utils import ImageUtils
 import os
@@ -81,15 +81,13 @@ class DeduplicationModule(BaseFunctionModule):
         self.similarity_spinbox.setSuffix(" %")
         similarity_layout.addWidget(self.similarity_spinbox)
         
-        # 操作按钮
+        # 操作按钮 - 开始/停止切换按钮
         button_layout = QHBoxLayout()
-        self.scan_btn = QPushButton("🔍 开始扫描")
-        self.scan_btn.clicked.connect(self.start_scan)
-        self.stop_btn = QPushButton("⏹️ 停止")
-        self.stop_btn.clicked.connect(self.stop_execution)
-        self.stop_btn.setEnabled(False)
-        button_layout.addWidget(self.scan_btn)
-        button_layout.addWidget(self.stop_btn)
+        self.scan_stop_btn = QPushButton("🔍 开始扫描")
+        self.scan_stop_btn.clicked.connect(self.toggle_scan)
+        self.scan_stop_btn.setEnabled(False)  # 初始状态禁用，直到有路径
+        self.is_scanning = False  # 扫描状态
+        button_layout.addWidget(self.scan_stop_btn)
         
         # 添加到主布局
         layout.addWidget(path_group)
@@ -106,10 +104,37 @@ class DeduplicationModule(BaseFunctionModule):
         Returns:
             QWidget: 工作区UI面板
         """
-        # 延迟导入结果面板，避免循环导入
+        # 延迟导入结果面板和拖拽区域，避免循环导入
         from modules.deduplication.results_panel import DeduplicationResultsPanel
+        from modules.deduplication.drag_drop_area import DragDropArea
+        
         if self.workspace_ui is None:
-            self.workspace_ui = DeduplicationResultsPanel(self)
+            # 创建一个堆叠部件，用于在拖拽区域和结果面板之间切换
+            from PyQt6.QtWidgets import QStackedWidget, QVBoxLayout, QWidget
+            
+            # 创建主容器
+            container = QWidget()
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            
+            # 创建堆叠部件
+            self.workspace_stacked_widget = QStackedWidget()
+            
+            # 创建拖拽区域
+            self.drag_drop_area = DragDropArea()
+            self.drag_drop_area.paths_dropped.connect(self.on_paths_dropped)
+            self.workspace_stacked_widget.addWidget(self.drag_drop_area)
+            
+            # 创建结果面板
+            self.results_panel = DeduplicationResultsPanel(self)
+            self.workspace_stacked_widget.addWidget(self.results_panel)
+            
+            # 默认显示拖拽区域（索引0）
+            self.workspace_stacked_widget.setCurrentIndex(0)
+            
+            layout.addWidget(self.workspace_stacked_widget)
+            self.workspace_ui = container
+            
         return self.workspace_ui
 
     def add_path(self):
@@ -119,6 +144,10 @@ class DeduplicationModule(BaseFunctionModule):
         if path and path not in self.scan_paths:
             self.scan_paths.append(path)
             self.path_list.addItem(path)
+            
+            # 同步到拖拽区域
+            if hasattr(self, "drag_drop_area"):
+                self.drag_drop_area.set_paths(self.scan_paths)
 
     def remove_path(self):
         """移除选中的路径"""
@@ -127,12 +156,27 @@ class DeduplicationModule(BaseFunctionModule):
             self.path_list.takeItem(row)
             if row < len(self.scan_paths):
                 del self.scan_paths[row]
+                
+        # 同步到拖拽区域
+        if hasattr(self, "drag_drop_area"):
+            self.drag_drop_area.set_paths(self.scan_paths)
 
     def clear_paths(self):
         """清空所有路径"""
         self.path_list.clear()
         self.scan_paths.clear()
+        
+        # 同步到拖拽区域
+        if hasattr(self, "drag_drop_area"):
+            self.drag_drop_area.set_paths(self.scan_paths)
 
+    def toggle_scan(self):
+        """切换扫描状态"""
+        if not self.is_scanning:
+            self.start_scan()
+        else:
+            self.stop_execution()
+    
     def start_scan(self):
         """开始扫描"""
         self.similarity_threshold = self.similarity_spinbox.value()
@@ -141,8 +185,30 @@ class DeduplicationModule(BaseFunctionModule):
             self.log_message.emit("请添加至少一个扫描路径", "warning")
             return
             
-        self.scan_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
+        self.is_scanning = True
+        self.scan_stop_btn.setText("⏹️ 停止扫描")
+        self.scan_stop_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3A3A3A;
+                color: white;
+                border: 1px solid #4C4C4C;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+                color: #FF8C00;
+            }
+            QPushButton:pressed {
+                background-color: #333333;
+                color: #FF8C00;
+            }
+        """)
+        
+        # 切换到结果面板
+        if hasattr(self, "workspace_stacked_widget"):
+            self.workspace_stacked_widget.setCurrentIndex(1)
         
         # 执行扫描（这里应该在后台线程中进行）
         self.execute({
@@ -176,8 +242,34 @@ class DeduplicationModule(BaseFunctionModule):
             if total_files == 0:
                 self.log_message.emit("未找到任何图片文件", "warning")
                 self.progress_updated.emit(100, "扫描完成")
-                self.scan_btn.setEnabled(True)
-                self.stop_btn.setEnabled(False)
+                self.is_scanning = False
+                self.scan_stop_btn.setText("🔍 开始扫描")
+                self.scan_stop_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #3A3A3A;
+                        color: white;
+                        border: 1px solid #4C4C4C;
+                        padding: 6px 12px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #4A4A4A;
+                        color: #FF8C00;
+                    }
+                    QPushButton:pressed {
+                        background-color: #333333;
+                        color: #FF8C00;
+                    }
+                    QPushButton:disabled {
+                        background-color: #555555;
+                        color: #A0A0A0;
+                    }
+                """)
+                
+                # 如果没有找到文件，切换回拖拽区域
+                if hasattr(self, "workspace_stacked_widget"):
+                    self.workspace_stacked_widget.setCurrentIndex(0)
                 return
             
             self.log_message.emit(f"总共找到 {total_files} 个图片文件", "info")
@@ -213,18 +305,71 @@ class DeduplicationModule(BaseFunctionModule):
                     'total_duplicates': 0
                 })
                 
+                # 如果没有找到重复图片，切换回拖拽区域
+                if hasattr(self, "workspace_stacked_widget"):
+                    self.workspace_stacked_widget.setCurrentIndex(0)
+                
         except Exception as e:
             self.log_message.emit(f"扫描过程中出错: {str(e)}", "error")
             self.progress_updated.emit(100, "扫描出错")
             
-        self.scan_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
+            # 出错时切换回拖拽区域
+            if hasattr(self, "workspace_stacked_widget"):
+                self.workspace_stacked_widget.setCurrentIndex(0)
+            
+        # 这里不需要设置按钮状态，因为已经统一使用 scan_stop_btn
 
     def stop_execution(self):
         """
         停止执行
         """
         self.log_message.emit("用户停止了扫描", "info")
-        self.scan_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
+        self.is_scanning = False
+        self.scan_stop_btn.setText("🔍 开始扫描")
+        self.scan_stop_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3A3A3A;
+                color: white;
+                border: 1px solid #4C4C4C;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+                color: #FF8C00;
+            }
+            QPushButton:pressed {
+                background-color: #333333;
+                color: #FF8C00;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #A0A0A0;
+            }
+        """)
         self.progress_updated.emit(0, "已停止")
+        
+        # 切换回拖拽区域
+        if hasattr(self, "workspace_stacked_widget"):
+            self.workspace_stacked_widget.setCurrentIndex(0)
+            
+    def on_paths_dropped(self, paths):
+        """
+        处理拖拽进来的路径
+        
+        Args:
+            paths: 拖拽进来的路径列表
+        """
+        # 更新扫描路径
+        new_path_count = 0
+        for path in paths:
+            if path not in self.scan_paths:
+                self.scan_paths.append(path)
+                self.path_list.addItem(path)
+                new_path_count += 1
+        
+        if new_path_count > 0:
+            self.log_message.emit(f"已自动添加 {new_path_count} 个路径到扫描列表", "info")
+            # 启用扫描按钮
+            self.scan_stop_btn.setEnabled(True)

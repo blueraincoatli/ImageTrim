@@ -837,8 +837,9 @@ class DeduplicationResultsPanel(QWidget):
                 background-color: #4A4A4A;
             }
             QPushButton:checked {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF7AC0, stop:1 #FF4F9A);
-                border: 1px solid transparent;
+                background-color: #4A4A4A;
+                color: #F2F2F2;
+                border: 1px solid #4C4C4C;
             }
         """)
         self.log_btn.clicked.connect(self.toggle_log)
@@ -1029,27 +1030,25 @@ class DeduplicationResultsPanel(QWidget):
         base_bg = '#3A3A3A'
         base_border = '#4C4C4C'
         base_text = '#F2F2F2'
-        primary_gradient = 'background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF7AC0, stop:1 #FF4F9A);'
-        hover_gradient = 'background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF8BC8, stop:1 #FF66A8);'
-        pressed_gradient = 'background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF5FAE, stop:1 #FF3F8E);'
+        orange_text = '#FF8C00'
 
         if primary:
             return f"""
             QPushButton {{
-                {primary_gradient}
+                background-color: {base_bg};
                 color: white;
-                border: 1px solid transparent;
+                border: 1px solid {base_border};
                 padding: 6px 12px;
                 border-radius: 4px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
-                {hover_gradient}
-                color: white;
+                background-color: #4A4A4A;
+                color: {orange_text};
             }}
             QPushButton:pressed {{
-                {pressed_gradient}
-                color: white;
+                background-color: #333333;
+                color: {orange_text};
             }}
             QPushButton:disabled {{
                 background-color: #555555;
@@ -1068,9 +1067,11 @@ class DeduplicationResultsPanel(QWidget):
             }}
             QPushButton:hover {{
                 background-color: #4A4A4A;
+                color: {orange_text};
             }}
             QPushButton:pressed {{
                 background-color: #333333;
+                color: {orange_text};
             }}
             QPushButton:disabled {{
                 background-color: #2C2C2C;

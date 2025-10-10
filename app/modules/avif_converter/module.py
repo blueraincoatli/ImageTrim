@@ -110,9 +110,53 @@ class AVIFConverterModule(BaseFunctionModule):
         button_layout = QHBoxLayout()
         self.convert_btn = QPushButton("🔄 开始转换")
         self.convert_btn.clicked.connect(self.start_conversion)
+        self.convert_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3A3A3A;
+                color: white;
+                border: 1px solid #4C4C4C;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+                color: #FF8C00;
+            }
+            QPushButton:pressed {
+                background-color: #333333;
+                color: #FF8C00;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #A0A0A0;
+            }
+        """)
         self.stop_btn = QPushButton("⏹️ 停止")
         self.stop_btn.clicked.connect(self.stop_execution)
         self.stop_btn.setEnabled(False)
+        self.stop_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3A3A3A;
+                color: white;
+                border: 1px solid #4C4C4C;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4A4A4A;
+                color: #FF8C00;
+            }
+            QPushButton:pressed {
+                background-color: #333333;
+                color: #FF8C00;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #A0A0A0;
+            }
+        """)
         button_layout.addWidget(self.convert_btn)
         button_layout.addWidget(self.stop_btn)
         
