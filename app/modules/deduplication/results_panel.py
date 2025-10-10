@@ -39,6 +39,7 @@ class ClickablePathLabel(QLabel):
         self.setWordWrap(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._tooltip_parent = None
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         
     def set_tooltip_parent(self, tooltip_parent):
         """设置悬浮框父级，用于保持显示"""
@@ -128,14 +129,18 @@ class ImagePathTooltip(QFrame):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setStyleSheet("""
             QFrame {
                 background-color: rgba(40, 40, 40, 255);
                 border: 1px solid #888888;
                 border-radius: 6px;
                 padding: 8px;
+                min-width: 200px;
+                min-height: 30px;
             }
         """)
         self.setMouseTracking(True)
@@ -151,6 +156,7 @@ class ImagePathTooltip(QFrame):
         # 清除现有标签
         for label in self.path_labels:
             label.setParent(None)
+            label.deleteLater()
         self.path_labels.clear()
         
         # 为每个路径创建可点击的标签
@@ -164,197 +170,25 @@ class ImagePathTooltip(QFrame):
             
         # 调整窗口大小
         self.adjustSize()
+        
+        # 确保窗口尺寸在合理范围内
+        min_width = 200
+        min_height = 30
+        max_width = 800
+        max_height = 600
+        
+        current_width = self.width()
+        current_height = self.height()
+        
+        # 限制尺寸在合理范围内
+        new_width = max(min_width, min(current_width, max_width))
+        new_height = max(min_height, min(current_height, max_height))
+        
+        if new_width != current_width or new_height != current_height:
+            self.setFixedSize(new_width, new_height)
 
 
-class ImageViewerDialog(QDialog):
-    """图片查看器对话框"""
-    
-    def __init__(self, image_path: str, parent=None):
-        super().__init__(parent)
-        self.image_path = image_path
-        self.zoom_factor = 1.0
-        self.init_ui()
-        self.load_image()
-        
-    def init_ui(self):
-        """初始化UI"""
-        self.setWindowTitle(f"图片预览 - {os.path.basename(self.image_path)}")
-        self.setWindowState(Qt.WindowState.WindowMaximized)
-        self.setStyleSheet("background-color: #1e1e1e;")
-        
-        # 创建主布局
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        # 创建图形视图
-        self.graphics_view = QGraphicsView()
-        self.graphics_view.setStyleSheet("border: none; background-color: #1e1e1e;")
-        self.graphics_view.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.graphics_view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        self.graphics_view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        
-        # 创建场景
-        self.scene = QGraphicsScene()
-        self.graphics_view.setScene(self.scene)
-        
-        layout.addWidget(self.graphics_view)
-        
-        # 添加快捷键
-        self.add_shortcuts()
-        
-        # 状态标签
-        self.status_label = QLabel()
-        self.status_label.setStyleSheet("color: white; background-color: rgba(0, 0, 0, 180); padding: 5px;")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.status_label)
-        
-    def add_shortcuts(self):
-        """添加快捷键"""
-        # ESC关闭
-        esc_shortcut = QShortcut(QKeySequence("Escape"), self)
-        esc_shortcut.activated.connect(self.close)
-        
-        # Ctrl+Q关闭
-        quit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
-        quit_shortcut.activated.connect(self.close)
-        
-        # 空格键居中
-        space_shortcut = QShortcut(QKeySequence("Space"), self)
-        space_shortcut.activated.connect(self.center_image)
-        
-        # +放大
-        plus_shortcut = QShortcut(QKeySequence("+"), self)
-        plus_shortcut.activated.connect(self.zoom_in)
-        
-        # -缩小
-        minus_shortcut = QShortcut(QKeySequence("-"), self)
-        minus_shortcut.activated.connect(self.zoom_out)
-        
-        # 100%大小
-        one_shortcut = QShortcut(QKeySequence("1"), self)
-        one_shortcut.activated.connect(self.zoom_100)
-        
-        # 适合窗口大小
-        f_shortcut = QShortcut(QKeySequence("F"), self)
-        f_shortcut.activated.connect(self.fit_to_window)
-        
-    def load_image(self):
-        """加载图片"""
-        try:
-            # 使用PIL加载图片以支持更多格式
-            from PIL import Image, ImageFile
-            # 设置加载截断处理，避免因截断图像导致的错误
-            ImageFile.LOAD_TRUNCATED_IMAGES = True
-            
-            with Image.open(self.image_path) as img:
-                # 转换为RGB（处理RGBA等格式）
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
-                
-                # 检查图像尺寸是否合理
-                if img.width <= 0 or img.height <= 0:
-                    raise Exception("无效的图像尺寸")
-                
-                # 限制最大尺寸以避免内存问题
-                max_dimension = 8192
-                if img.width > max_dimension or img.height > max_dimension:
-                    # 按比例缩放
-                    ratio = min(max_dimension / img.width, max_dimension / img.height)
-                    new_width = int(img.width * ratio)
-                    new_height = int(img.height * ratio)
-                    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                # 转换为QImage
-                data = img.tobytes("raw", "RGB")
-                qimage = QImage(data, img.width, img.height, QImage.Format.Format_RGB888)
-                pixmap = QPixmap.fromImage(qimage)
-                
-            # 清除场景
-            self.scene.clear()
-            
-            # 添加图片到场景
-            self.pixmap_item = QGraphicsPixmapItem(pixmap)
-            self.scene.addItem(self.pixmap_item)
-            
-            # 设置视图为100%大小
-            self.zoom_100()
-            
-            # 更新状态
-            self.update_status(img.width, img.height, os.path.getsize(self.image_path))
-            
-        except Exception as e:
-            error_msg = f"无法加载图片: {str(e)}"
-            self.status_label.setText(error_msg)
-            print(error_msg)
-            # 显示错误信息而不是退出程序
-            self.scene.clear()
-            error_item = self.scene.addText(error_msg, self.font())
-            error_item.setDefaultTextColor(QColor(255, 0, 0))
-            
-    def update_status(self, width: int, height: int, size: int):
-        """更新状态信息"""
-        size_str = self.format_file_size(size)
-        self.status_label.setText(f"{width}×{height} | {size_str} | 缩放: {self.zoom_factor*100:.0f}% (空格居中, +/-缩放, F适合窗口, ESC退出)")
-        
-    def format_file_size(self, size: int) -> str:
-        """格式化文件大小"""
-        for unit in ['B', 'KB', 'MB', 'GB']:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} TB"
-        
-    def zoom_in(self):
-        """放大"""
-        self.zoom_factor *= 1.2
-        self.apply_zoom()
-        
-    def zoom_out(self):
-        """缩小"""
-        self.zoom_factor /= 1.2
-        self.apply_zoom()
-        
-    def zoom_100(self):
-        """100%大小"""
-        self.zoom_factor = 1.0
-        self.apply_zoom()
-        
-    def fit_to_window(self):
-        """适合窗口大小"""
-        if hasattr(self, 'pixmap_item') and self.pixmap_item.pixmap().width() > 0:
-            view_rect = self.graphics_view.viewport().rect()
-            pixmap_rect = self.pixmap_item.boundingRect()
-            
-            # 计算缩放因子
-            scale_x = view_rect.width() / pixmap_rect.width()
-            scale_y = view_rect.height() / pixmap_rect.height()
-            self.zoom_factor = min(scale_x, scale_y)
-            
-            self.apply_zoom()
-            
-    def apply_zoom(self):
-        """应用缩放"""
-        if hasattr(self, 'pixmap_item'):
-            # 保存当前中心点
-            center = self.graphics_view.mapToScene(self.graphics_view.viewport().rect().center())
-            
-            # 应用缩放
-            self.graphics_view.resetTransform()
-            self.graphics_view.scale(self.zoom_factor, self.zoom_factor)
-            
-            # 恢复中心点
-            self.graphics_view.centerOn(center)
-            
-            # 更新状态
-            if os.path.exists(self.image_path):
-                from PIL import Image
-                with Image.open(self.image_path) as img:
-                    self.update_status(img.width, img.height, os.path.getsize(self.image_path))
-                    
-    def center_image(self):
-        """居中图片"""
-        if hasattr(self, 'pixmap_item'):
-            self.graphics_view.centerOn(self.pixmap_item)
+
 
 
 class DuplicateImageWidget(QFrame):
@@ -542,58 +376,91 @@ class DuplicateImageWidget(QFrame):
             return
         super().mousePressEvent(event)
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
         self.image_double_clicked.emit(self.file_path)
+        event.accept()
         
     def enterEvent(self, event):
         """鼠标进入事件 - 显示路径提示"""
-        if self.file_path:
-            # 创建工具提示窗口
-            if not self._tooltip:
-                self._tooltip = ImagePathTooltip(self)
-            
-            # 显示路径
-            self._tooltip.show_paths([self.file_path])
-            
-            # 获取全局位置（更靠近鼠标位置）
-            mouse_pos = QCursor.pos()
-            tooltip_width = self._tooltip.width() if self._tooltip.width() > 0 else 300
-            tooltip_height = self._tooltip.height() if self._tooltip.height() > 0 else 100
-            
-            # 将提示窗口定位在鼠标右上方附近，避免被鼠标遮挡
-            screen = QCoreApplication.instance().primaryScreen()
-            if screen:
-                screen_geometry = screen.availableGeometry()
-                # 计算最佳位置，避免超出屏幕边界
-                x = min(mouse_pos.x() + 10, screen_geometry.right() - tooltip_width - 10)
-                y = max(mouse_pos.y() - tooltip_height - 10, screen_geometry.top() + 10)
-                self._tooltip.move(x, y)
-            else:
-                # 如果无法获取屏幕信息，使用简单定位
-                self._tooltip.move(mouse_pos.x() + 10, mouse_pos.y() - 50)
-            self._tooltip.show()
-            
+        # 先调用父类方法确保正常处理
         super().enterEvent(event)
+        
+        if self.file_path:
+            try:
+                # 创建工具提示窗口
+                if not self._tooltip:
+                    self._tooltip = ImagePathTooltip(self)
+                
+                # 显示路径
+                self._tooltip.show_paths([self.file_path])
+                
+                # 获取全局位置（更靠近鼠标位置）
+                mouse_pos = QCursor.pos()
+                tooltip_width = self._tooltip.width() if self._tooltip.width() > 0 else 300
+                tooltip_height = self._tooltip.height() if self._tooltip.height() > 0 else 100
+                
+                # 将提示窗口定位在鼠标右上方附近，避免被鼠标遮挡
+                screen = QCoreApplication.instance().primaryScreen()
+                if screen:
+                    screen_geometry = screen.availableGeometry()
+                    # 计算最佳位置，避免超出屏幕边界
+                    x = min(mouse_pos.x() + 10, screen_geometry.right() - tooltip_width - 10)
+                    y = max(mouse_pos.y() - tooltip_height - 10, screen_geometry.top() + 10)
+                    self._tooltip.move(x, y)
+                else:
+                    # 如果无法获取屏幕信息，使用简单定位
+                    self._tooltip.move(mouse_pos.x() + 10, mouse_pos.y() - 50)
+                self._tooltip.show()
+            except Exception as e:
+                # 如果显示提示出错，不显示提示但不中断程序
+                print(f"显示悬浮提示时出错: {e}")
+                if self._tooltip:
+                    try:
+                        self._tooltip.hide()
+                    except:
+                        pass
+                    self._tooltip = None
         
     def leaveEvent(self, event):
         """鼠标离开事件 - 隐藏路径提示"""
-        if self._tooltip:
-            # 延迟隐藏，让用户有时间点击路径
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(800, self._hide_tooltip)
+        # 先调用父类方法确保正常处理
         super().leaveEvent(event)
+        
+        if self._tooltip:
+            try:
+                # 延迟隐藏，让用户有时间点击路径
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(300, self._hide_tooltip)  # 缩短延迟时间
+            except Exception as e:
+                # 如果设置定时器出错，立即隐藏
+                print(f"设置悬浮提示隐藏定时器时出错: {e}")
+                try:
+                    self._tooltip.hide()
+                    self._tooltip.deleteLater()
+                except:
+                    pass
+                self._tooltip = None
         
     def _hide_tooltip(self):
         """延迟隐藏提示框"""
         if self._tooltip:
-            # 检查鼠标是否在提示框或其子元素上
-            if self._tooltip.underMouse():
-                # 如果鼠标在提示框上，延迟再次检查
-                from PyQt6.QtCore import QTimer
-                QTimer.singleShot(200, self._hide_tooltip)
-                return
-            self._tooltip.hide()
+            try:
+                # 检查鼠标是否在提示框或其子元素上
+                if self._tooltip.underMouse():
+                    # 如果鼠标在提示框上，延迟再次检查
+                    from PyQt6.QtCore import QTimer
+                    QTimer.singleShot(200, self._hide_tooltip)
+                    return
+                self._tooltip.hide()
+                self._tooltip.deleteLater()
+            except Exception as e:
+                print(f"隐藏悬浮提示时出错: {e}")
+            finally:
+                self._tooltip = None
 
 
 class DuplicateGroupWidget(QFrame):
@@ -848,6 +715,10 @@ class DuplicateGroupWidget(QFrame):
             event.accept()
             return
         super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        # 如果双击事件没有被子组件处理，则传递给父类
+        super().mouseDoubleClickEvent(event)
 
     def badge_text(self) -> str:
         return self.badge_label.text() if self.badge_label else ''
@@ -1389,8 +1260,26 @@ class DeduplicationResultsPanel(QWidget):
     def on_image_double_clicked(self, file_path):
         """处理图片双击事件"""
         # 创建并显示图片查看器对话框
-        viewer = ImageViewerDialog(file_path, self)
-        viewer.exec()
+        try:
+            # 使用系统默认图片查看器打开图片
+            import subprocess
+            import platform
+            import os
+            
+            if not os.path.exists(file_path):
+                QMessageBox.warning(self, "文件不存在", f"文件不存在: {file_path}")
+                return
+                
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(file_path)
+            elif system == "Darwin":  # macOS
+                subprocess.run(["open", file_path])
+            else:  # Linux
+                subprocess.run(["xdg-open", file_path])
+        except Exception as e:
+            print(f"打开图片时出错: {e}")
+            QMessageBox.critical(self, "错误", f"无法打开图片: {str(e)}")
         
     def update_selection_count(self):
         count = len(self.selected_files)
