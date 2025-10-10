@@ -5,7 +5,7 @@
 
 import os
 import shutil
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                              QTextEdit, QScrollArea, QGridLayout, QProgressBar,
                              QFrame, QCheckBox, QSplitter, QFileDialog, QMessageBox,
@@ -209,23 +209,28 @@ class ImageViewerDialog(QDialog):
             self.graphics_view.centerOn(self.pixmap_item)
 
 
+
 class DuplicateImageWidget(QFrame):
     """
     重复图片控件 - 支持双击预览
     """
-    
+
     # 定义信号
     selection_changed = pyqtSignal(list, bool)  # files, is_selected
     image_double_clicked = pyqtSignal(str)  # file_path
-    
+
     def __init__(self, file_path: str, width: int = 180, height: int = 120, parent=None):
         super().__init__(parent)
         self.file_path = file_path
-        self.width = width
+        self.width = width  # 保持与历史单测兼容
         self.height = height
+        self.thumbnail_width = width
+        self.thumbnail_height = height
         self.is_selected = False
+        self._image_cache = None
+        self._thumbnail_signal_connected = False
         self.init_ui()
-        
+
     def init_ui(self):
         """初始化UI"""
         # 设置样式（透明背景）
@@ -246,10 +251,9 @@ class DuplicateImageWidget(QFrame):
         # 创建图片标签
         self.image_label = self.create_image_label()
         layout.addWidget(self.image_label)
-        
+
     def create_image_label(self):
         """创建图片标签，使用新的内存图片缓存系统"""
-        # 创建容器标签（完美居中显示）
         container = QLabel()
         container.setAlignment(Qt.AlignmentFlag.AlignCenter)
         container.setStyleSheet("""
@@ -261,184 +265,167 @@ class DuplicateImageWidget(QFrame):
                 qproperty-alignment: AlignCenter;
             }
         """)
+        container.setFixedSize(self.thumbnail_width, self.thumbnail_height)
+        self.image_label = container
 
-        # 使用新的内存图片缓存系统
         try:
             from utils.image_cache_enhanced import get_image_cache
-            image_cache = get_image_cache()
+            self._image_cache = get_image_cache()
 
-            # 获取统一缩略图
-            pixmap = image_cache.get_thumbnail_pixmap(
-                self.file_path,
-                self.width,
-                self.height
-            )
+            if not self._thumbnail_signal_connected:
+                self._image_cache.thumbnail_ready.connect(self._on_thumbnail_ready)
+                self._thumbnail_signal_connected = True
 
-            if pixmap and not pixmap.isNull():
-                # 设置缩略图并确保完美居中
-                container.setPixmap(pixmap)
-
-                # 强制重新计算布局以确保居中
-                container.update()
-                container.updateGeometry()
-            else:
-                # 显示占位符
-                container.setText("⏳")
-                container.setStyleSheet("""
-                    QLabel {
-                        color: #6c757d;
-                        font-size: 24px;
-                        background-color: #1e1e1e;
-                        border: none;
-                        padding: 0px;
-                        margin: 0px;
-                    }
-                """)
-
-                # 连接缩略图准备好信号
-                try:
-                    # 确保只连接一次信号
-                    if not hasattr(self, '_thumbnail_signal_connected'):
-                        image_cache.thumbnail_ready.connect(self._on_thumbnail_ready)
-                        self._thumbnail_signal_connected = True
-                except Exception as e:
-                    print(f"连接缩略图准备好信号失败: {e}")
-
-        except Exception as e:
+            self._apply_placeholder(container)
+            self._request_thumbnail()
+        except Exception as e:  # pylint: disable=broad-except
             print(f"图片缓存加载失败: {e}")
-            # 如果缓存加载失败，使用原始方法
             return self._create_image_label_fallback(container)
 
         return container
 
-    def _create_image_label_fallback(self, container):
-        """备用方法：直接加载图片"""
+    def _apply_placeholder(self, label: QLabel):
+        label.clear()
+        label.setText("⌛")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet("""
+            QLabel {
+                color: #6c757d;
+                font-size: 20px;
+                background-color: transparent;
+                border: none;
+                padding: 0px;
+                margin: 0px;
+            }
+        """)
+
+    def _apply_pixmap(self, pixmap: QPixmap):
+        if not pixmap or pixmap.isNull():
+            self._apply_placeholder(self.image_label)
+            return
+
+        scaled = pixmap.scaled(
+            self.thumbnail_width,
+            self.thumbnail_height,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.image_label.setPixmap(scaled)
+        self.image_label.setText("")
+        self.image_label.update()
+        self.image_label.updateGeometry()
+
+    def _request_thumbnail(self):
+        if not self._image_cache:
+            return
+
+        pixmap = self._image_cache.get_thumbnail_pixmap(
+            self.file_path,
+            self.thumbnail_width,
+            self.thumbnail_height,
+        )
+
+        if pixmap:
+            self._apply_pixmap(pixmap)
+
+    def _create_image_label_fallback(self, container: QLabel):
+        """备用方法：直接加载图像"""
         try:
-            # 获取原始图片尺寸
             from PIL import Image
             with Image.open(self.file_path) as img:
                 original_width, original_height = img.size
 
-            # 计算缩放比例，确保图片适应指定尺寸的容器
-            container_aspect_ratio = self.width / self.height
-            image_aspect_ratio = original_width / original_height
+            container_aspect_ratio = self.thumbnail_width / self.thumbnail_height
+            image_aspect_ratio = original_width / original_height if original_height else 1
 
             if image_aspect_ratio > container_aspect_ratio:
-                # 图片更宽，以宽度为准
-                new_width = self.width
+                new_width = self.thumbnail_width
                 new_height = int(new_width / image_aspect_ratio)
             else:
-                # 图片更高，以高度为准
-                new_height = self.height
+                new_height = self.thumbnail_height
                 new_width = int(new_height * image_aspect_ratio)
 
-            # 限制图片最大尺寸
-            if new_width > self.width:
-                new_width = self.width
-            if new_height > self.height:
-                new_height = self.height
+            new_width = max(1, min(new_width, self.thumbnail_width))
+            new_height = max(1, min(new_height, self.thumbnail_height))
 
             container.setFixedSize(new_width, new_height)
 
-            # 获取缩略图
             thumbnail = ImageUtils.get_thumbnail(self.file_path, (new_width, new_height))
-            # 将PIL图像转换为QImage
             thumbnail = thumbnail.convert("RGBA")
             data = thumbnail.tobytes("raw", "RGBA")
             qimage = QImage(data, thumbnail.width, thumbnail.height, QImage.Format.Format_RGBA8888)
             pixmap = QPixmap.fromImage(qimage)
             container.setPixmap(pixmap)
-        except Exception as e:
-            # 如果加载失败，显示错误图标
+        except Exception as e:  # pylint: disable=broad-except
             container.setText("🚫")
-            container.setFixedSize(self.width, self.height)
+            container.setFixedSize(self.thumbnail_width, self.thumbnail_height)
             container.setStyleSheet("color: #dc3545; font-size: 24px; background-color: transparent; border: none;")
+            print(f"直接加载缩略图失败: {e}")
 
         return container
 
-    def _on_thumbnail_ready(self, file_path, pixmap):
+    def _on_thumbnail_ready(self, file_path: str, width: int, height: int, pixmap: QPixmap):
         """缩略图准备好时的回调"""
-        if file_path == self.file_path and hasattr(self, 'image_label'):
-            try:
-                # 缓存系统已经提供了正确尺寸的缩略图，直接设置
-                if pixmap and not pixmap.isNull():
-                    # 按宽度缩放图片，保持原始宽高比
-                    scaled_pixmap = pixmap.scaledToWidth(
-                        self.width,
-                        Qt.TransformationMode.SmoothTransformation
-                    )
-                    self.image_label.setPixmap(scaled_pixmap)
-                else:
-                    # 如果缩略图为空，显示占位符
-                    self.image_label.setText("⏳")
-                    self.image_label.setStyleSheet("""
-                        QLabel {
-                            color: #6c757d;
-                            font-size: 24px;
-                            background-color: transparent;
-                            border: none;
-                            padding: 0px;
-                            margin: 0px;
-                        }
-                    """)
-            except Exception as e:
-                print(f"设置缩略图时出错: {e}")
-                # 显示错误占位符
-                self.image_label.setText("🚫")
-                self.image_label.setStyleSheet("""
-                    QLabel {
-                        color: #dc3545;
-                        font-size: 24px;
-                        background-color: transparent;
-                        border: none;
-                        padding: 0px;
-                        margin: 0px;
-                    }
-                """)
+        if file_path != self.file_path:
+            return
 
-            # 强制重新计算布局以确保完美居中
-            self.image_label.update()
-            self.image_label.updateGeometry()
-        
+        if width != self.thumbnail_width or height != self.thumbnail_height:
+            return
+
+        self._apply_pixmap(pixmap)
+
+    def update_thumbnail_size(self, width: int, height: int):
+        """更新缩略图尺寸"""
+        self.thumbnail_width = max(1, width)
+        self.thumbnail_height = max(1, height)
+        self.width = self.thumbnail_width
+        self.height = self.thumbnail_height
+        self.image_label.setFixedSize(self.thumbnail_width, self.thumbnail_height)
+        self._apply_placeholder(self.image_label)
+        self._request_thumbnail()
+
+    def refresh_thumbnail(self):
+        """刷新当前缩略图"""
+        self._request_thumbnail()
+
     def mousePressEvent(self, event):
         """处理鼠标点击事件"""
         super().mousePressEvent(event)
         self.set_selected(not self.is_selected)
-        
+
     def mouseDoubleClickEvent(self, event):
         """处理鼠标双击事件"""
         super().mouseDoubleClickEvent(event)
         self.image_double_clicked.emit(self.file_path)
-        
+
     def set_selected(self, selected):
         """设置选中状态"""
         self.is_selected = selected
-        
+
         # 只更新状态，不改变视觉效果
         # 发出信号
         self.selection_changed.emit([self.file_path], selected)
-
 
 class DuplicateGroupWidget(QFrame):
     """
     重复图片组控件
     """
-    
+
     # 定义信号
     selection_changed = pyqtSignal(list, bool)  # files, is_selected
     image_double_clicked = pyqtSignal(str)  # file_path
-    
+
     def __init__(self, group_id: int, files: List[str], confidence: float, parent=None):
         super().__init__(parent)
         self.group_id = group_id
         self.files = files
         self.confidence = confidence
         self.is_selected = False
-        self.image_widgets = []  # 存储图片控件
-        self.images_layout = None
-        self.card_height = 0  # 卡片高度
+        self.image_widgets: List[DuplicateImageWidget] = []
+        self.images_layout: Optional[QHBoxLayout] = None
+        self.card_height = 0
         self.init_ui()
-        
+
     def init_ui(self):
         """初始化UI"""
         self.setStyleSheet("""
@@ -451,11 +438,11 @@ class DuplicateGroupWidget(QFrame):
                 background-color: #252525;
             }
         """)
-        
+
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
-        
+
         images_container = QFrame()
         images_container.setStyleSheet("background-color: transparent; border: none;")
         self.images_layout = QHBoxLayout(images_container)
@@ -465,54 +452,56 @@ class DuplicateGroupWidget(QFrame):
 
     def update_thumbnails(self, card_width: int):
         """更新缩略图大小"""
-        # 设置卡片固定宽高比 (宽度:高度 = 2:1)
-        self.card_height = int(card_width / 2)
+        if self.images_layout is None:
+            return
+
+        self.card_height = max(50, int(card_width / 2))
         self.setFixedHeight(self.card_height)
-        
-        # 计算内边距和间距
-        padding = int(self.card_height / 6)  # 内边距为卡片高度的1/6
-        spacing = int(self.card_height / 12)  # 图片间距为卡片高度的1/12
-        
-        # 设置图片布局的边距
+
+        padding = int(self.card_height / 6)
+        spacing = int(self.card_height / 12)
         self.images_layout.setContentsMargins(padding, padding, padding, padding)
         self.images_layout.setSpacing(spacing)
-        
-        # 清除现有内容
-        for widget in self.image_widgets:
-            widget.setParent(None)
-        self.image_widgets.clear()
-        
-        while self.images_layout.count():
-            child = self.images_layout.takeAt(0)
-            if child.widget():
-                child.widget().setParent(None)
 
-        # 计算每张图片的可用空间
-        if len(self.files) > 0:
-            # 可用宽度 = 卡片宽度 - 2*内边距 - (图片数量-1)*间距
-            available_width = card_width - 2 * padding - (len(self.files) - 1) * spacing
-            # 每张图片的平均宽度
-            image_width = int(available_width / len(self.files))
-            # 图片高度应该根据卡片高度和内边距计算，留出一些额外空间
-            image_height = self.card_height - 2 * padding - 10  # 减去一些额外空间确保图片不会超出边界
-            # 确保图片高度不为负数
-            image_height = max(50, image_height)  # 最小高度为50像素
+        if self.files:
+            available_width = max(50, card_width - 2 * padding - (len(self.files) - 1) * spacing)
+            image_width = max(50, int(available_width / max(len(self.files), 1)))
+            image_height = max(50, self.card_height - 2 * padding - 10)
         else:
-            image_width = 100  # 默认宽度
-            image_height = 50  # 默认高度
-            
-        # 重新添加控件
-        for file_path in self.files:
+            image_width = 100
+            image_height = 50
+
+        current_count = len(self.image_widgets)
+        target_count = len(self.files)
+
+        if current_count > target_count:
+            for widget in self.image_widgets[target_count:]:
+                if self.images_layout.indexOf(widget) != -1:
+                    self.images_layout.removeWidget(widget)
+                widget.setParent(None)
+            self.image_widgets = self.image_widgets[:target_count]
+
+        while len(self.image_widgets) < target_count:
+            file_path = self.files[len(self.image_widgets)]
             image_widget = DuplicateImageWidget(file_path, image_width, image_height)
             image_widget.selection_changed.connect(self.on_image_selection_changed)
             image_widget.image_double_clicked.connect(self.image_double_clicked.emit)
             self.images_layout.addWidget(image_widget)
             self.image_widgets.append(image_widget)
-        
+
+        for widget, file_path in zip(self.image_widgets, self.files):
+            widget.file_path = file_path
+            widget.update_thumbnail_size(image_width, image_height)
+
+    def refresh_thumbnails(self):
+        """刷新所有缩略图"""
+        for widget in self.image_widgets:
+            widget.refresh_thumbnail()
+
     def on_image_selection_changed(self, files, is_selected):
         """处理图片选择变化"""
         self.selection_changed.emit(self.files, is_selected)
-        
+
     def set_selected(self, selected):
         """设置选中状态"""
         self.is_selected = selected
@@ -538,8 +527,6 @@ class DuplicateGroupWidget(QFrame):
         self.style().unpolish(self)
         self.style().polish(self)
         self.selection_changed.emit(self.files, selected)
-
-
 class DeduplicationResultsPanel(QWidget):
     """
     图片去重结果面板
@@ -732,21 +719,16 @@ class DeduplicationResultsPanel(QWidget):
                 width: 20px;
                 margin: -8px 0;
                 border-radius: 10px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             }
             QSlider::handle:horizontal:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                                          stop:0 #FFA500, stop:0.5 #FF8C00, stop:1 #FFA500);
                 border: 2px solid #ffffff;
-                box-shadow: 0 4px 8px rgba(255,140,0,0.4);
-                transform: scale(1.1);
             }
             QSlider::handle:horizontal:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                                          stop:0 #FF6B35, stop:0.5 #FF4500, stop:1 #FF6B35);
                 border: 2px solid #ffffff;
-                box-shadow: 0 2px 6px rgba(255,140,0,0.6);
-                transform: scale(0.95);
             }
             QSlider::sub-page:horizontal {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -907,12 +889,10 @@ class DeduplicationResultsPanel(QWidget):
                     for group_widget in self.duplicate_groups:
                         if hasattr(group_widget, 'files') and group_widget.files:
                             self.update_group_widget_size(group_widget, column_width)
+                            group_widget.refresh_thumbnails()
 
                     # 强制UI更新
                     self.scroll_area.viewport().update()
-                    
-                    # 触发所有缩略图重新加载
-                    self.reload_all_thumbnails()
         except Exception as e:
             print(f"强制刷新缩略图时出错: {e}")
 
@@ -1206,16 +1186,11 @@ class DeduplicationResultsPanel(QWidget):
     def reload_all_thumbnails(self):
         """重新加载所有缩略图"""
         try:
-            # 通过更新整个网格布局来重新加载所有缩略图
-            # 这会重新创建所有图片控件，从而触发缩略图的重新加载
-            self.update_grid_layout()
-            
-            # 额外触发一次缓存刷新
-            from utils.image_cache_enhanced import get_image_cache
-            image_cache = get_image_cache()
-            
-            # 清理缓存并重新生成
-            image_cache.clear_cache()
+            for group_widget in self.duplicate_groups:
+                group_widget.refresh_thumbnails()
+
+            # 触发UI刷新以反映最新缩略图
+            self.scroll_area.viewport().update()
         except Exception as e:
             print(f"重新加载缩略图时出错: {e}")
 
@@ -1337,11 +1312,6 @@ class DeduplicationResultsPanel(QWidget):
             print(f"更新网格布局时出错: {str(e)}")
             if hasattr(self, 'status_label'):
                 self.status_label.setText("布局更新出错，请尝试调整窗口大小或更改列数")
-
-
-
-
-
 
 
 
