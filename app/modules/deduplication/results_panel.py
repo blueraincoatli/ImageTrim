@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-图片去重结果面板 - 完全重新实现，基于备份目录中的代码
+图片去重结果面板
 """
 
 import os
 import shutil
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                              QTextEdit, QScrollArea, QGridLayout, QProgressBar,
                              QFrame, QCheckBox, QSplitter, QFileDialog, QMessageBox,
                              QApplication, QDialog, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
-                             QSlider)
+                             QSlider, QRubberBand)
 from PyQt6.QtWidgets import QSizePolicy
-from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QCoreApplication
+from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QCoreApplication, QEvent, QPoint, QRect
 from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen, QScreen
 from utils.image_utils import ImageUtils
 from utils.ui_helpers import UIHelpers
@@ -209,54 +209,33 @@ class ImageViewerDialog(QDialog):
             self.graphics_view.centerOn(self.pixmap_item)
 
 
-
 class DuplicateImageWidget(QFrame):
-    """
-    重复图片控件 - 支持双击预览
-    """
+    """重复图片控件 - 支持双击预览"""
 
-    # 定义信号
-    selection_changed = pyqtSignal(list, bool)  # files, is_selected
-    image_double_clicked = pyqtSignal(str)  # file_path
+    image_double_clicked = pyqtSignal(str)
 
     def __init__(self, file_path: str, width: int = 180, height: int = 120, parent=None):
         super().__init__(parent)
         self.file_path = file_path
-        self.width = width  # 保持与历史单测兼容
+        self.width = width
         self.height = height
         self.thumbnail_width = width
         self.thumbnail_height = height
         self.is_selected = False
+        self.group_widget: Optional["DuplicateGroupWidget"] = None
         self._image_cache = None
         self._thumbnail_signal_connected = False
         self.init_ui()
 
     def init_ui(self):
-        """初始化UI"""
-        # 设置样式（透明背景）
-        self.setStyleSheet("""
-            QFrame {
-                background-color: transparent;
-                border: none;
-                border-radius: 0px;
-            }
-        """)
-
-        # 主布局（居中对齐）
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # 创建图片标签
-        self.image_label = self.create_image_label()
-        layout.addWidget(self.image_label)
-
-    def create_image_label(self):
-        """创建图片标签，使用新的内存图片缓存系统"""
-        container = QLabel()
-        container.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        container.setStyleSheet("""
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_label.setStyleSheet("""
             QLabel {
                 background-color: transparent;
                 border: none;
@@ -265,24 +244,19 @@ class DuplicateImageWidget(QFrame):
                 qproperty-alignment: AlignCenter;
             }
         """)
-        container.setFixedSize(self.thumbnail_width, self.thumbnail_height)
-        self.image_label = container
+        layout.addWidget(self.image_label)
 
         try:
             from utils.image_cache_enhanced import get_image_cache
             self._image_cache = get_image_cache()
-
             if not self._thumbnail_signal_connected:
                 self._image_cache.thumbnail_ready.connect(self._on_thumbnail_ready)
                 self._thumbnail_signal_connected = True
-
-            self._apply_placeholder(container)
+            self._apply_placeholder(self.image_label)
             self._request_thumbnail()
-        except Exception as e:  # pylint: disable=broad-except
-            print(f"图片缓存加载失败: {e}")
-            return self._create_image_label_fallback(container)
-
-        return container
+        except Exception as exc:  # pylint: disable=broad-except
+            print(f"图片缓存加载失败: {exc}")
+            self._create_image_label_fallback(self.image_label)
 
     def _apply_placeholder(self, label: QLabel):
         label.clear()
@@ -304,12 +278,28 @@ class DuplicateImageWidget(QFrame):
             self._apply_placeholder(self.image_label)
             return
 
+        # 确保image_label的尺寸正确设置
+        self.image_label.setFixedSize(self.thumbnail_width, self.thumbnail_height)
+        
+        # 使用KeepAspectRatioByExpanding确保图片填满整个区域
         scaled = pixmap.scaled(
             self.thumbnail_width,
             self.thumbnail_height,
-            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation,
         )
+        
+        # 计算居中显示的矩形区域
+        pixmap_rect = scaled.rect()
+        label_rect = QRect(0, 0, self.thumbnail_width, self.thumbnail_height)
+        
+        # 如果图片比例与标签比例不匹配，居中裁剪
+        if pixmap_rect.width() > label_rect.width() or pixmap_rect.height() > label_rect.height():
+            x = max(0, (pixmap_rect.width() - label_rect.width()) // 2)
+            y = max(0, (pixmap_rect.height() - label_rect.height()) // 2)
+            crop_rect = QRect(x, y, label_rect.width(), label_rect.height())
+            scaled = scaled.copy(crop_rect)
+        
         self.image_label.setPixmap(scaled)
         self.image_label.setText("")
         self.image_label.update()
@@ -324,96 +314,117 @@ class DuplicateImageWidget(QFrame):
             self.thumbnail_width,
             self.thumbnail_height,
         )
-
         if pixmap:
             self._apply_pixmap(pixmap)
 
-    def _create_image_label_fallback(self, container: QLabel):
-        """备用方法：直接加载图像"""
+    def _create_image_label_fallback(self, label: QLabel):
         try:
             from PIL import Image
             with Image.open(self.file_path) as img:
                 original_width, original_height = img.size
 
+            # 确保标签尺寸正确设置
+            label.setFixedSize(self.thumbnail_width, self.thumbnail_height)
+
+            # 使用居中裁剪的方式确保图片填满指定区域
             container_aspect_ratio = self.thumbnail_width / self.thumbnail_height
             image_aspect_ratio = original_width / original_height if original_height else 1
 
             if image_aspect_ratio > container_aspect_ratio:
-                new_width = self.thumbnail_width
-                new_height = int(new_width / image_aspect_ratio)
-            else:
+                # 图片更宽，裁剪宽度
                 new_height = self.thumbnail_height
                 new_width = int(new_height * image_aspect_ratio)
+                # 居中裁剪
+                left = (new_width - self.thumbnail_width) // 2
+                top = 0
+                right = left + self.thumbnail_width
+                bottom = new_height
+            else:
+                # 图片更高，裁剪高度
+                new_width = self.thumbnail_width
+                new_height = int(new_width / image_aspect_ratio)
+                # 居中裁剪
+                left = 0
+                top = (new_height - self.thumbnail_height) // 2
+                right = new_width
+                bottom = top + self.thumbnail_height
 
-            new_width = max(1, min(new_width, self.thumbnail_width))
-            new_height = max(1, min(new_height, self.thumbnail_height))
-
-            container.setFixedSize(new_width, new_height)
-
+            # 获取缩略图并进行裁剪
             thumbnail = ImageUtils.get_thumbnail(self.file_path, (new_width, new_height))
+            if new_width != self.thumbnail_width or new_height != self.thumbnail_height:
+                # 进行居中裁剪
+                thumbnail = thumbnail.crop((left, top, right, bottom))
+            
             thumbnail = thumbnail.convert("RGBA")
             data = thumbnail.tobytes("raw", "RGBA")
             qimage = QImage(data, thumbnail.width, thumbnail.height, QImage.Format.Format_RGBA8888)
             pixmap = QPixmap.fromImage(qimage)
-            container.setPixmap(pixmap)
-        except Exception as e:  # pylint: disable=broad-except
-            container.setText("🚫")
-            container.setFixedSize(self.thumbnail_width, self.thumbnail_height)
-            container.setStyleSheet("color: #dc3545; font-size: 24px; background-color: transparent; border: none;")
-            print(f"直接加载缩略图失败: {e}")
-
-        return container
+            label.setPixmap(pixmap)
+        except Exception as exc:  # pylint: disable=broad-except
+            label.setText("🚫")
+            label.setStyleSheet("color: #dc3545; font-size: 24px; background-color: transparent; border: none;")
+            print(f"直接加载缩略图失败: {exc}")
 
     def _on_thumbnail_ready(self, file_path: str, width: int, height: int, pixmap: QPixmap):
-        """缩略图准备好时的回调"""
         if file_path != self.file_path:
             return
-
         if width != self.thumbnail_width or height != self.thumbnail_height:
             return
-
         self._apply_pixmap(pixmap)
 
     def update_thumbnail_size(self, width: int, height: int):
-        """更新缩略图尺寸"""
         self.thumbnail_width = max(1, width)
         self.thumbnail_height = max(1, height)
         self.width = self.thumbnail_width
         self.height = self.thumbnail_height
+        # 确保控件本身也设置正确的尺寸
+        self.setFixedSize(self.thumbnail_width, self.thumbnail_height)
         self.image_label.setFixedSize(self.thumbnail_width, self.thumbnail_height)
         self._apply_placeholder(self.image_label)
         self._request_thumbnail()
 
     def refresh_thumbnail(self):
-        """刷新当前缩略图"""
         self._request_thumbnail()
 
     def mousePressEvent(self, event):
-        """处理鼠标点击事件"""
+        if event.button() == Qt.MouseButton.LeftButton and self.group_widget:
+            self.group_widget.handle_selection_trigger(event.modifiers())
+            event.accept()
+            return
         super().mousePressEvent(event)
-        self.set_selected(not self.is_selected)
 
     def mouseDoubleClickEvent(self, event):
-        """处理鼠标双击事件"""
         super().mouseDoubleClickEvent(event)
         self.image_double_clicked.emit(self.file_path)
 
-    def set_selected(self, selected):
-        """设置选中状态"""
-        self.is_selected = selected
-
-        # 只更新状态，不改变视觉效果
-        # 发出信号
-        self.selection_changed.emit([self.file_path], selected)
 
 class DuplicateGroupWidget(QFrame):
-    """
-    重复图片组控件
+    """重复图片组控件"""
+
+    selection_changed = pyqtSignal(list, bool)
+    image_double_clicked = pyqtSignal(str)
+
+    _BASE_STYLE = """
+        QFrame {
+            background-color: #1B1B1B;
+            border: 1px solid #353535;
+            border-radius: 8px;
+        }
+        QFrame:hover {
+            background-color: #252525;
+        }
     """
 
-    # 定义信号
-    selection_changed = pyqtSignal(list, bool)  # files, is_selected
-    image_double_clicked = pyqtSignal(str)  # file_path
+    _SELECTED_STYLE = """
+        QFrame {
+            background-color: #252525;
+            border: 1px solid #FF8C00;
+            border-radius: 8px;
+        }
+        QFrame:hover {
+            background-color: #252525;
+        }
+    """
 
     def __init__(self, group_id: int, files: List[str], confidence: float, parent=None):
         super().__init__(parent)
@@ -423,21 +434,13 @@ class DuplicateGroupWidget(QFrame):
         self.is_selected = False
         self.image_widgets: List[DuplicateImageWidget] = []
         self.images_layout: Optional[QHBoxLayout] = None
+        self.stack_widget: Optional[QFrame] = None
+        self.badge_label: Optional[QLabel] = None
         self.card_height = 0
         self.init_ui()
 
     def init_ui(self):
-        """初始化UI"""
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #1B1B1B;
-                border: 1px solid #353535;
-                border-radius: 8px;
-            }
-            QFrame:hover {
-                background-color: #252525;
-            }
-        """)
+        self.setStyleSheet(self._BASE_STYLE)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -448,85 +451,209 @@ class DuplicateGroupWidget(QFrame):
         self.images_layout = QHBoxLayout(images_container)
         self.images_layout.setContentsMargins(0, 0, 0, 0)
         self.images_layout.setSpacing(0)
+
+        self.stack_widget = QFrame(images_container)
+        self.stack_widget.setStyleSheet("background-color: transparent; border: none;")
+        self.stack_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.images_layout.addWidget(self.stack_widget)
+
+        self.badge_label = QLabel(self.stack_widget)
+        self.badge_label.setVisible(False)
+        self.badge_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 160);
+                color: white;
+                font-size: 12px;
+                padding: 2px 6px;
+                border-radius: 10px;
+            }
+        """)
+
         main_layout.addWidget(images_container)
 
     def update_thumbnails(self, card_width: int):
-        """更新缩略图大小"""
-        if self.images_layout is None:
+        if self.images_layout is None or self.stack_widget is None:
             return
 
-        self.card_height = max(50, int(card_width / 2))
+        # 使用更合理的卡片高度比例
+        self.card_height = max(120, int(card_width / 2))  # 2:1比例
         self.setFixedHeight(self.card_height)
 
-        padding = int(self.card_height / 6)
-        spacing = int(self.card_height / 12)
+        # 设置合理的内边距和间距
+        padding = max(12, int(self.card_height / 10))
+        spacing = max(6, int(self.card_height / 20))
         self.images_layout.setContentsMargins(padding, padding, padding, padding)
         self.images_layout.setSpacing(spacing)
 
-        if self.files:
-            available_width = max(50, card_width - 2 * padding - (len(self.files) - 1) * spacing)
-            image_width = max(50, int(available_width / max(len(self.files), 1)))
-            image_height = max(50, self.card_height - 2 * padding - 10)
-        else:
-            image_width = 100
-            image_height = 50
+        # 计算可用空间
+        stack_width = max(100, card_width - 2 * padding)
+        stack_height = max(100, self.card_height - 2 * padding)
+        self.stack_widget.setFixedSize(stack_width, stack_height)
 
+        # 确保图片控件数量正确
         current_count = len(self.image_widgets)
         target_count = len(self.files)
 
         if current_count > target_count:
             for widget in self.image_widgets[target_count:]:
-                if self.images_layout.indexOf(widget) != -1:
-                    self.images_layout.removeWidget(widget)
                 widget.setParent(None)
             self.image_widgets = self.image_widgets[:target_count]
 
         while len(self.image_widgets) < target_count:
-            file_path = self.files[len(self.image_widgets)]
-            image_widget = DuplicateImageWidget(file_path, image_width, image_height)
-            image_widget.selection_changed.connect(self.on_image_selection_changed)
-            image_widget.image_double_clicked.connect(self.image_double_clicked.emit)
-            self.images_layout.addWidget(image_widget)
-            self.image_widgets.append(image_widget)
+            widget = DuplicateImageWidget(self.files[len(self.image_widgets)], stack_width, stack_height, self.stack_widget)
+            widget.group_widget = self
+            widget.image_double_clicked.connect(self.image_double_clicked.emit)
+            widget.setParent(self.stack_widget)
+            widget.show()
+            self.image_widgets.append(widget)
 
-        for widget, file_path in zip(self.image_widgets, self.files):
-            widget.file_path = file_path
-            widget.update_thumbnail_size(image_width, image_height)
+        for idx, widget in enumerate(self.image_widgets):
+            if idx >= target_count:
+                widget.hide()
+                continue
+            widget.group_widget = self
+            widget.file_path = self.files[idx]
+            widget.update_thumbnail_size(stack_width, stack_height)
+            widget.show()
+
+        if not self.files:
+            self.badge_label.hide()
+            return
+
+        # 根据文件数量调整显示方式
+        if len(self.files) == 1:
+            # 只有一张图片，居中显示
+            if self.image_widgets:
+                widget = self.image_widgets[0]
+                # 使用卡片的大部分空间
+                thumb_width = max(80, stack_width - 20)
+                thumb_height = max(80, stack_height - 20)
+                widget.update_thumbnail_size(thumb_width, thumb_height)
+                # 居中放置
+                x_pos = max(0, (stack_width - thumb_width) // 2)
+                y_pos = max(0, (stack_height - thumb_height) // 2)
+                widget.move(x_pos, y_pos)
+                widget.show()
+                widget.raise_()
+            self.badge_label.hide()
+        elif len(self.files) == 2:
+            # 两张图片并列显示，使用更多空间
+            if len(self.image_widgets) >= 2:
+                # 计算每个图片的尺寸，使用更多可用空间
+                thumb_width = max(80, (stack_width - spacing) // 2 - 10)
+                thumb_height = max(80, stack_height - 20)
+                
+                # 第一张图片放在左边
+                widget1 = self.image_widgets[0]
+                widget1.update_thumbnail_size(thumb_width, thumb_height)
+                y_pos = max(0, (stack_height - thumb_height) // 2)
+                widget1.move(10, y_pos)  # 左边距10px
+                widget1.show()
+                widget1.raise_()
+                
+                # 第二张图片放在右边
+                widget2 = self.image_widgets[1]
+                widget2.update_thumbnail_size(thumb_width, thumb_height)
+                x_pos = max(0, stack_width - thumb_width - 10)  # 右边距10px
+                y_pos = max(0, (stack_height - thumb_height) // 2)
+                widget2.move(x_pos, y_pos)
+                widget2.show()
+                widget2.raise_()
+            self.badge_label.hide()
+        else:
+            # 三张或更多图片：第一张单独显示，其余堆叠显示
+            # 第一张图片放在左边，使用更多空间
+            if len(self.image_widgets) >= 1:
+                thumb_width = max(80, (stack_width - spacing) // 2 - 15)
+                thumb_height = max(80, stack_height - 20)
+                
+                widget1 = self.image_widgets[0]
+                widget1.update_thumbnail_size(thumb_width, thumb_height)
+                y_pos = max(0, (stack_height - thumb_height) // 2)
+                widget1.move(10, y_pos)  # 左边距10px
+                widget1.show()
+                widget1.raise_()
+            
+            # 其余图片堆叠显示在右边
+            remaining_count = len(self.files) - 1
+            if remaining_count > 0:
+                # 右侧区域使用剩余空间
+                right_area_width = max(80, stack_width - thumb_width - spacing - 20)
+                right_area_height = max(80, stack_height - 20)
+                right_area_x = thumb_width + spacing + 10
+                right_area_y = max(0, (stack_height - right_area_height) // 2)
+                
+                # 堆叠图片的最大显示数量
+                max_display = min(remaining_count, 5)
+                overlap = min(max(10, right_area_width // 12), 25)
+                
+                # 计算堆叠图片的尺寸
+                stacked_thumb_width = max(60, right_area_width - overlap * (max_display - 1) - 10)
+                stacked_thumb_height = max(60, right_area_height - 10)
+                
+                base_x = right_area_x + max(0, (right_area_width - stacked_thumb_width - overlap * (max_display - 1)) // 2)
+                base_y = right_area_y + max(0, (right_area_height - stacked_thumb_height) // 2)
+                
+                # 显示堆叠的图片
+                for i in range(max_display):
+                    if i < remaining_count and (i + 1) < len(self.image_widgets):
+                        widget = self.image_widgets[i + 1]
+                        widget.update_thumbnail_size(stacked_thumb_width, stacked_thumb_height)
+                        offset = overlap * i
+                        widget.move(base_x + offset, base_y + offset)
+                        widget.show()
+                
+                # 确保堆叠顺序正确（最后一张在最上面）
+                for i in reversed(range(min(max_display, remaining_count))):
+                    if (i + 1) < len(self.image_widgets):
+                        self.image_widgets[i + 1].raise_()
+                
+                # 显示数量角标（如果超过5张）
+                if remaining_count > 5:
+                    remaining = remaining_count - 5 + 1
+                    self.badge_label.setText(f"×{remaining}")
+                    self.badge_label.adjustSize()
+                    badge_x = right_area_x + right_area_width - self.badge_label.width() - 5
+                    badge_y = right_area_y + 5
+                    self.badge_label.move(max(right_area_x + 5, badge_x), max(right_area_y + 5, badge_y))
+                    self.badge_label.show()
+                else:
+                    self.badge_label.hide()
 
     def refresh_thumbnails(self):
-        """刷新所有缩略图"""
         for widget in self.image_widgets:
             widget.refresh_thumbnail()
 
-    def on_image_selection_changed(self, files, is_selected):
-        """处理图片选择变化"""
-        self.selection_changed.emit(self.files, is_selected)
+    def handle_selection_trigger(self, modifiers: Qt.KeyboardModifier):
+        ctrl_pressed = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        new_state = not self.is_selected if ctrl_pressed else True
+        self.set_selected(new_state)
 
-    def set_selected(self, selected):
-        """设置选中状态"""
+    def set_selected(self, selected: bool, propagate: bool = True):
+        if self.is_selected == selected:
+            return
         self.is_selected = selected
         if selected:
-            self.setStyleSheet("""
-                QFrame {
-                    background-color: #2a2a2e;
-                    border: 2px solid #FF8C00;
-                    border-radius: 8px;
-                }
-            """)
+            self.setStyleSheet(self._SELECTED_STYLE)
         else:
-            self.setStyleSheet("""
-                QFrame {
-                    background-color: #1B1B1B;
-                    border: 1px solid #353535;
-                    border-radius: 8px;
-                }
-                QFrame:hover {
-                    background-color: #252525;
-                }
-            """)
+            self.setStyleSheet(self._BASE_STYLE)
         self.style().unpolish(self)
         self.style().polish(self)
-        self.selection_changed.emit(self.files, selected)
+
+        if propagate:
+            self.selection_changed.emit(self.files, selected)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.handle_selection_trigger(event.modifiers())
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def badge_text(self) -> str:
+        return self.badge_label.text() if self.badge_label else ''
+
+
 class DeduplicationResultsPanel(QWidget):
     """
     图片去重结果面板
@@ -545,6 +672,12 @@ class DeduplicationResultsPanel(QWidget):
         print(f"DPI调试: 初始化DPI缩放因子 = {self.dpi_scale_factor}")
 
         self.init_ui()
+        self._selection_band = QRubberBand(QRubberBand.Shape.Rectangle, self.scroll_area.viewport())
+        self._selection_band.hide()
+        self._drag_selecting = False
+        self._drag_additive = False
+        self._drag_start_pos = QPoint()
+        self.scroll_area.viewport().installEventFilter(self)
         self.connect_signals()
 
     def get_dpi_scale_factor(self):
@@ -591,83 +724,29 @@ class DeduplicationResultsPanel(QWidget):
         
         # 全选/取消全选按钮
         self.select_all_btn = QPushButton("全选")
-        self.select_all_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #007bff;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #0069d9;
-            }
-        """)
+        self.select_all_btn.setStyleSheet(self._button_style(primary=True))
         self.select_all_btn.clicked.connect(self.select_all)
         top_layout.addWidget(self.select_all_btn)
-        
+
         self.unselect_all_btn = QPushButton("取消全选")
-        self.unselect_all_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #6c757d;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #5a6268;
-            }
-        """)
+        self.unselect_all_btn.setStyleSheet(self._button_style(primary=False))
         self.unselect_all_btn.clicked.connect(self.unselect_all)
         top_layout.addWidget(self.unselect_all_btn)
         
         # 选中计数标签
-        self.selection_count_label = QLabel("选中: 0")
+        self.selection_count_label = QLabel("选中重复: 0")
         self.selection_count_label.setStyleSheet("color: white; margin: 0 10px;")
         top_layout.addWidget(self.selection_count_label)
         
         # 操作按钮
         self.delete_btn = QPushButton("🗑️ 删除选中")
-        self.delete_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #dc3545;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #c82333;
-            }
-            QPushButton:disabled {
-                background-color: #6c757d;
-            }
-        """)
+        self.delete_btn.setStyleSheet(self._button_style(primary=True))
         self.delete_btn.clicked.connect(self.delete_selected)
         self.delete_btn.setEnabled(False)
         top_layout.addWidget(self.delete_btn)
-        
+
         self.move_btn = QPushButton("📂 移动到...")
-        self.move_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ffc107;
-                color: black;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #e0a800;
-            }
-            QPushButton:disabled {
-                background-color: #6c757d;
-            }
-        """)
+        self.move_btn.setStyleSheet(self._button_style(primary=True))
         self.move_btn.clicked.connect(self.move_selected)
         self.move_btn.setEnabled(False)
         top_layout.addWidget(self.move_btn)
@@ -677,18 +756,19 @@ class DeduplicationResultsPanel(QWidget):
         self.log_btn.setCheckable(True)
         self.log_btn.setStyleSheet("""
             QPushButton {
-                background-color: #333337;
-                color: white;
-                border: 1px solid #454545;
+                background-color: #3A3A3A;
+                color: #F2F2F2;
+                border: 1px solid #4C4C4C;
                 padding: 6px 12px;
                 border-radius: 4px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #3f3f46;
+                background-color: #4A4A4A;
             }
             QPushButton:checked {
-                background-color: #0078d7;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF7AC0, stop:1 #FF4F9A);
+                border: 1px solid transparent;
             }
         """)
         self.log_btn.clicked.connect(self.toggle_log)
@@ -875,6 +955,104 @@ class DeduplicationResultsPanel(QWidget):
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(100, self.delayed_layout_update)
 
+    def _button_style(self, primary: bool = False) -> str:
+        base_bg = '#3A3A3A'
+        base_border = '#4C4C4C'
+        base_text = '#F2F2F2'
+        primary_gradient = 'background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF7AC0, stop:1 #FF4F9A);'
+        hover_gradient = 'background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF8BC8, stop:1 #FF66A8);'
+        pressed_gradient = 'background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF5FAE, stop:1 #FF3F8E);'
+
+        if primary:
+            return f"""
+            QPushButton {{
+                {primary_gradient}
+                color: white;
+                border: 1px solid transparent;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                {hover_gradient}
+                color: white;
+            }}
+            QPushButton:pressed {{
+                {pressed_gradient}
+                color: white;
+            }}
+            QPushButton:disabled {{
+                background-color: #555555;
+                color: #A0A0A0;
+            }}
+            """
+        else:
+            return f"""
+            QPushButton {{
+                background-color: {base_bg};
+                color: {base_text};
+                border: 1px solid {base_border};
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #4A4A4A;
+            }}
+            QPushButton:pressed {{
+                background-color: #333333;
+            }}
+            QPushButton:disabled {{
+                background-color: #2C2C2C;
+                color: #7A7A7A;
+                border-color: #3A3A3A;
+            }}
+            """
+
+    def eventFilter(self, source, event):
+        if source is self.scroll_area.viewport():
+            if event.type() == QEvent.Type.MouseButtonPress:
+                if (event.button() == Qt.MouseButton.LeftButton and
+                        event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+                    self._drag_selecting = True
+                    self._drag_additive = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
+                    self._drag_start_pos = event.position().toPoint()
+                    self._selection_band.setGeometry(QRect(self._drag_start_pos, self._drag_start_pos))
+                    self._selection_band.show()
+                    return True
+            elif event.type() == QEvent.Type.MouseMove and self._drag_selecting:
+                current_pos = event.position().toPoint()
+                selection_rect = QRect(self._drag_start_pos, current_pos).normalized()
+                self._selection_band.setGeometry(selection_rect)
+                return True
+            elif event.type() == QEvent.Type.MouseButtonRelease and self._drag_selecting:
+                current_pos = event.position().toPoint()
+                selection_rect = QRect(self._drag_start_pos, current_pos).normalized()
+                self._selection_band.hide()
+                self._drag_selecting = False
+
+                if selection_rect.width() < 3 and selection_rect.height() < 3:
+                    selection_rect = QRect(current_pos - QPoint(2, 2), current_pos + QPoint(2, 2))
+
+                self._apply_drag_selection(selection_rect.normalized(), self._drag_additive)
+                return True
+
+        return super().eventFilter(source, event)
+
+    def _apply_drag_selection(self, selection_rect: QRect, toggle_mode: bool):
+        if selection_rect.isNull() or not self.duplicate_groups:
+            return
+
+        for group_widget in self.duplicate_groups:
+            top_left = group_widget.mapTo(self.scroll_area.viewport(), QPoint(0, 0))
+            group_rect = QRect(top_left, group_widget.size())
+
+            if selection_rect.intersects(group_rect):
+                if toggle_mode:
+                    group_widget.set_selected(not group_widget.is_selected)
+                else:
+                    group_widget.set_selected(True)
+
     def force_thumbnail_refresh(self):
         """强制刷新缩略图显示"""
         try:
@@ -901,6 +1079,11 @@ class DeduplicationResultsPanel(QWidget):
         if hasattr(self, 'grid_layout') and self.grid_layout:
             print("DPI调试: 执行延迟布局更新")
             self.update_grid_layout()
+            
+    def on_splitter_moved(self, pos, index):
+        """处理分割器移动事件"""
+        # 当分割器移动时，更新网格布局
+        self.update_grid_layout()
             
     def update_progress(self, value: float, message: str):
         """更新进度"""
@@ -993,17 +1176,17 @@ class DeduplicationResultsPanel(QWidget):
             self.status_label.setText("未找到重复图片")
             
     def on_group_selection_changed(self, files, is_selected):
-        """处理组选择变化"""
+        payload = files[1:] if len(files) > 1 else []
         if is_selected:
-            self.selected_files.update(files)
+            self.selected_files.update(payload)
         else:
-            self.selected_files.difference_update(files)
-            
-        # 更新UI
+            self.selected_files.difference_update(payload)
+
         self.update_selection_count()
-        self.delete_btn.setEnabled(len(self.selected_files) > 0)
-        self.move_btn.setEnabled(len(self.selected_files) > 0)
-        
+        has_selection = len(self.selected_files) > 0
+        self.delete_btn.setEnabled(has_selection)
+        self.move_btn.setEnabled(has_selection)
+
     def on_image_double_clicked(self, file_path):
         """处理图片双击事件"""
         # 创建并显示图片查看器对话框
@@ -1011,37 +1194,33 @@ class DeduplicationResultsPanel(QWidget):
         viewer.exec()
         
     def update_selection_count(self):
-        """更新选中计数"""
         count = len(self.selected_files)
-        self.selection_count_label.setText(f"选中: {count}")
-        
+        self.selection_count_label.setText(f"选中重复: {count}")
+
     def select_all(self):
-        """全选"""
+        all_files: Set[str] = set()
         for group in self.duplicate_groups:
             group.set_selected(True)
-            
-        # 收集所有文件
-        all_files = set()
-        for group in self.duplicate_groups:
-            all_files.update(group.files)
-            
+            if len(group.files) > 1:
+                all_files.update(group.files[1:])
+
         self.selected_files = all_files
         self.update_selection_count()
-        self.delete_btn.setEnabled(len(self.selected_files) > 0)
-        self.move_btn.setEnabled(len(self.selected_files) > 0)
-        
+        has_selection = len(self.selected_files) > 0
+        self.delete_btn.setEnabled(has_selection)
+        self.move_btn.setEnabled(has_selection)
+
     def unselect_all(self):
-        """取消全选"""
         for group in self.duplicate_groups:
             group.set_selected(False)
-            
+
         self.selected_files.clear()
         self.update_selection_count()
         self.delete_btn.setEnabled(False)
         self.move_btn.setEnabled(False)
-        
+
     def delete_selected(self):
-        """删除选中文件"""
+        """删除选中文件 - 按重复组仅保留第一张，其余文件执行删除"""
         if not self.selected_files:
             return
             
@@ -1049,7 +1228,7 @@ class DeduplicationResultsPanel(QWidget):
         reply = QMessageBox.question(
             self, 
             "确认删除", 
-            f"确定要删除选中的 {len(self.selected_files)} 个文件吗？此操作不可撤销！",
+            f"确定要删除选中的 {len(self.selected_files)} 个重复文件吗？此操作不可撤销！",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
@@ -1064,13 +1243,16 @@ class DeduplicationResultsPanel(QWidget):
                     if os.path.exists(file_path):
                         os.remove(file_path)
                         success_count += 1
-                        self.module.log_message.emit(f"已删除: {file_path}", "info")
+                        if self.module:
+                            self.module.log_message.emit(f"已删除: {file_path}", "info")
                     else:
                         failed_files.append(file_path)
-                        self.module.log_message.emit(f"文件不存在: {file_path}", "warning")
+                        if self.module:
+                            self.module.log_message.emit(f"文件不存在: {file_path}", "warning")
                 except Exception as e:
                     failed_files.append(file_path)
-                    self.module.log_message.emit(f"删除失败 {file_path}: {str(e)}", "error")
+                    if self.module:
+                        self.module.log_message.emit(f"删除失败 {file_path}: {str(e)}", "error")
                     
             # 显示结果
             message = f"成功删除 {success_count} 个文件"
@@ -1079,14 +1261,17 @@ class DeduplicationResultsPanel(QWidget):
                 
             QMessageBox.information(self, "删除完成", message)
             
+            # 从UI中移除已删除的文件
+            self._remove_deleted_files_from_ui()
+            
             # 清空选中
             self.selected_files.clear()
             self.update_selection_count()
             self.delete_btn.setEnabled(False)
             self.move_btn.setEnabled(False)
-            
+
     def move_selected(self):
-        """移动选中文件"""
+        """移动选中文件 - 按重复组仅保留第一张，其余文件执行移动"""
         if not self.selected_files:
             return
             
@@ -1102,87 +1287,73 @@ class DeduplicationResultsPanel(QWidget):
         for file_path in self.selected_files:
             try:
                 if os.path.exists(file_path):
-                    file_name = os.path.basename(file_path)
-                    target_path = os.path.join(target_dir, file_name)
+                    # 生成目标文件路径
+                    filename = os.path.basename(file_path)
+                    target_path = os.path.join(target_dir, filename)
                     
                     # 如果目标文件已存在，添加序号
                     counter = 1
-                    base_name, ext = os.path.splitext(file_name)
+                    original_target_path = target_path
                     while os.path.exists(target_path):
-                        new_name = f"{base_name}_{counter}{ext}"
-                        target_path = os.path.join(target_dir, new_name)
+                        name, ext = os.path.splitext(original_target_path)
+                        target_path = f"{name}_{counter}{ext}"
                         counter += 1
-                        
+                    
                     shutil.move(file_path, target_path)
                     success_count += 1
-                    self.module.log_message.emit(f"已移动: {file_path} -> {target_path}", "info")
+                    if self.module:
+                        self.module.log_message.emit(f"已移动: {file_path} -> {target_path}", "info")
                 else:
                     failed_files.append(file_path)
-                    self.module.log_message.emit(f"文件不存在: {file_path}", "warning")
+                    if self.module:
+                        self.module.log_message.emit(f"文件不存在: {file_path}", "warning")
             except Exception as e:
                 failed_files.append(file_path)
-                self.module.log_message.emit(f"移动失败 {file_path}: {str(e)}", "error")
+                if self.module:
+                    self.module.log_message.emit(f"移动失败 {file_path}: {str(e)}", "error")
                 
         # 显示结果
-        message = f"成功移动 {success_count} 个文件到 {target_dir}"
+        message = f"成功移动 {success_count} 个文件"
         if failed_files:
             message += f"，失败 {len(failed_files)} 个文件"
             
         QMessageBox.information(self, "移动完成", message)
+        
+        # 从UI中移除已移动的文件
+        self._remove_deleted_files_from_ui()
         
         # 清空选中
         self.selected_files.clear()
         self.update_selection_count()
         self.delete_btn.setEnabled(False)
         self.move_btn.setEnabled(False)
+
+    def _remove_deleted_files_from_ui(self):
+        """从UI中移除已删除或已移动的文件"""
+        # 创建新的重复组列表，移除不包含任何文件的组
+        remaining_groups = []
         
-    def toggle_log(self):
-        """切换日志显示"""
-        self.log_area.setVisible(self.log_btn.isChecked())
+        for group in self.duplicate_groups:
+            # 过滤掉已删除的文件
+            remaining_files = [f for f in group.files if os.path.exists(f) or f not in self.selected_files]
+            
+            if len(remaining_files) > 1:  # 仍然有重复文件
+                group.files = remaining_files
+                # 更新组内图片显示
+                group.update_thumbnails(group.width())
+                remaining_groups.append(group)
+            elif len(remaining_files) == 1:  # 只剩一个文件，不再是重复组
+                # 从布局中移除
+                self.grid_layout.removeWidget(group)
+                group.setParent(None)
+                group.deleteLater()
         
-    def on_splitter_moved(self, pos, index):
-        """处理分割器移动事件"""
-        try:
-            # 延迟更新布局，避免在分割器拖动过程中频繁更新
-            self.update_grid_layout()
-        except Exception as e:
-            print(f"分割器移动时出错: {str(e)}")
-
-    def on_grid_size_changed(self, value):
-        """处理网格列数变化"""
-        self.grid_size = value
-
-        # 更新显示当前列数的标签
-        if hasattr(self, 'grid_size_value_label'):
-            self.grid_size_value_label.setText(str(value))
-
-        # 重新布局网格，这会更新每个重复组卡片的宽度
+        # 更新重复组列表
+        self.duplicate_groups = remaining_groups
+        
+        # 重新布局
         self.update_grid_layout()
-        
-        # 延迟刷新缩略图以确保布局已经更新
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(50, self.force_thumbnail_refresh)
 
-    def update_group_widget_size(self, group_widget, column_width):
-        """更新重复组卡片的尺寸和内部缩略图大小"""
-        # 直接传递卡片宽度给update_thumbnails方法
-        # DuplicateGroupWidget会根据固定宽高比自动计算高度
-        group_widget.update_thumbnails(column_width)
-
-    # update_all_thumbnails方法已移除，因为现在通过update_grid_layout和update_group_widget_size来处理
-        
-    def resizeEvent(self, event):
-        """处理窗口大小调整事件"""
-        try:
-            super().resizeEvent(event)
-            self.update_grid_layout()
-        except Exception as e:
-            # 捕获并记录调整大小时的错误，避免程序崩溃
-            print(f"窗口调整大小时出错: {str(e)}")
-            # 如果出错，至少确保基本布局还能工作
-            if hasattr(self, 'status_label'):
-                self.status_label.setText("布局更新出错，请尝试重新调整窗口大小")
-        
     def reload_all_thumbnails(self):
         """重新加载所有缩略图"""
         try:
@@ -1313,17 +1484,152 @@ class DeduplicationResultsPanel(QWidget):
             if hasattr(self, 'status_label'):
                 self.status_label.setText("布局更新出错，请尝试调整窗口大小或更改列数")
 
+    def toggle_log(self):
+        """切换日志区域的显示/隐藏"""
+        is_visible = self.log_area.isVisible()
+        self.log_area.setVisible(not is_visible)
+        # 更新按钮文本
+        if not is_visible:
+            self.log_btn.setText("📋 隐藏日志")
+        else:
+            self.log_btn.setText("📋 日志")
 
+    def on_grid_size_changed(self, value):
+        """处理网格列数改变事件"""
+        self.grid_size = value
+        self.grid_size_value_label.setText(str(value))
+        # 更新网格布局
+        self.update_grid_layout()
 
+    def update_group_widget_size(self, group_widget, column_width):
+        """更新组控件尺寸"""
+        # 确保列宽是正数
+        if column_width > 0:
+            # 更新组控件的缩略图显示
+            group_widget.update_thumbnails(column_width)
+            # 刷新缩略图显示
+            group_widget.refresh_thumbnails()
 
+    def on_splitter_moved(self, pos, index):
+        """处理分割器移动事件"""
+        # 当分割器移动时，更新网格布局
+        self.update_grid_layout()
 
+    def update_grid_layout(self):
+        """更新网格布局"""
+        if not self.duplicate_groups:
+            return
 
+        try:
+            # 使用滑块定义的列数
+            columns = self.grid_size  # 直接使用用户设置的列数
 
+            # 获取容器宽度和网格布局参数
+            container_width = self.scroll_area.viewport().width()
+            if container_width <= 0:
+                return  # 避免除零错误
 
+            # 获取网格布局的间距和边距
+            grid_spacing = self.grid_layout.spacing()  # 网格间距（默认10px）
+            margins = self.grid_layout.contentsMargins()
+            left_margin = margins.left()
+            right_margin = margins.right()
+            top_margin = margins.top()
+            bottom_margin = margins.bottom()
+            total_horizontal_margin = left_margin + right_margin
+            total_spacing_width = grid_spacing * (columns - 1)  # 列间距总数
 
+            # 考虑DPI缩放因子调整容器宽度
+            scaled_container_width = int(container_width / self.dpi_scale_factor)
 
+            # 计算实际可用的宽度（容器宽度 - 边距 - 间距）
+            available_width = scaled_container_width - total_horizontal_margin - total_spacing_width
 
+            # 计算每列的实际可用宽度
+            if available_width <= 0:
+                print(f"DPI调试: 警告 - 可用宽度为负数或零: available_width={available_width}, 跳过布局更新")
+                return  # 避免负数或零宽度
 
+            # 确保最小列宽
+            min_column_width = 100  # 最小列宽100px
+            if available_width < columns * min_column_width:
+                print(f"DPI调试: 警告 - 可用宽度不足以显示{columns}列, 最小需要{columns * min_column_width}px, 实际{available_width}px")
+                # 自动减少列数以适应可用宽度
+                columns = max(1, available_width // min_column_width)
+                total_spacing_width = grid_spacing * (columns - 1)
+                available_width = scaled_container_width - total_horizontal_margin - total_spacing_width
+                print(f"DPI调试: 自动调整列数为{columns}, 新的可用宽度={available_width}px")
 
+            actual_column_width = available_width // columns
 
+            # 为了显示实际值，我们也保存原始逻辑宽度
+            logical_container_width = container_width
+            logical_available_width = logical_container_width - total_horizontal_margin - total_spacing_width
+            logical_column_width = logical_available_width // columns
 
+            print(f"DPI调试: 更新布局 - 列数={columns}, 容器宽度={container_width}, 缩放容器宽度={scaled_container_width}")
+            print(f"DPI调试: 网格参数 - 左边距={left_margin}px, 右边距={right_margin}px, 总边距={total_horizontal_margin}px, 网格间距={grid_spacing}px, 总间距={total_spacing_width}px")
+            print(f"DPI调试: 可用宽度 - 缩放可用={available_width}px, 逻辑可用={logical_available_width}px")
+            print(f"DPI调试: 最终列宽 - 缩放列宽={actual_column_width}px, 逻辑列宽={logical_column_width}px, DPI缩放因子={self.dpi_scale_factor}")
+
+            # 清除现有的行和列拉伸因子
+            for i in range(self.grid_layout.rowCount()):
+                self.grid_layout.setRowStretch(i, 0)
+            for i in range(self.grid_layout.columnCount()):
+                self.grid_layout.setColumnStretch(i, 0)
+
+            # 清除现有布局中的所有控件
+            for i in reversed(range(self.grid_layout.count())):
+                widget = self.grid_layout.itemAt(i).widget()
+                if widget:
+                    self.grid_layout.removeWidget(widget)
+
+            # 重新添加所有卡片到网格布局，并更新每个卡片的尺寸
+            for i, group_widget in enumerate(self.duplicate_groups):
+                # 计算新位置
+                row = i // columns
+                col = i % columns
+
+                # 添加到新位置，居中对齐
+                self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignCenter)
+
+                # 更新这个重复组卡片的宽度并重新计算内部图片大小
+                self.update_group_widget_size(group_widget, actual_column_width)
+
+            # 设置每列的固定宽度，使用实际计算的列宽
+            for i in range(columns):
+                self.grid_layout.setColumnStretch(i, 1)
+                self.grid_layout.setColumnMinimumWidth(i, actual_column_width)
+
+            # 清除多余的列拉伸因子，避免影响布局
+            for i in range(columns, self.grid_layout.columnCount()):
+                self.grid_layout.setColumnStretch(i, 0)
+
+            # 添加一个可伸展的空白行，确保内容从顶部开始排列并可以正常滚动
+            rows = (len(self.duplicate_groups) + columns - 1) // columns
+            if rows > 0:
+                # 在最后一行添加一个伸展因子，确保可以滚动
+                self.grid_layout.setRowStretch(rows, 1)
+
+            # 更新状态信息，显示当前布局信息
+            if hasattr(self, 'status_label'):
+                current_status = self.status_label.text()
+                if "找到" in current_status:
+                    # 保留"找到 X 组重复图片"的信息，更新布局信息
+                    base_status = current_status.split('|')[0].strip()
+                    if self.dpi_scale_factor != 1.0:
+                        self.status_label.setText(f"{base_status} | 布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px | DPI缩放: {self.dpi_scale_factor:.2f}x")
+                    else:
+                        self.status_label.setText(f"{base_status} | 布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px")
+                else:
+                    # 如果没有找到重复图片的信息，只显示布局信息
+                    if self.dpi_scale_factor != 1.0:
+                        self.status_label.setText(f"布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px | DPI缩放: {self.dpi_scale_factor:.2f}x")
+                    else:
+                        self.status_label.setText(f"布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px")
+
+        except Exception as e:
+            # 捕获并记录布局更新时的错误
+            print(f"更新网格布局时出错: {str(e)}")
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("布局更新出错，请尝试调整窗口大小或更改列数")
