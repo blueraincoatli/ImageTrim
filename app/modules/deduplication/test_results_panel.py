@@ -32,10 +32,13 @@ sys.modules['utils.image_cache_enhanced'] = MagicMock()
 
 # 直接导入测试目标模块
 try:
-    from results_panel import DuplicateGroupWidget, DuplicateImageWidget
+    from .results_panel import DuplicateGroupWidget, DuplicateImageWidget
 except ImportError as e:
-    print(f"无法导入测试模块: {e}")
-    sys.exit(1)
+    try:
+        from modules.deduplication.results_panel import DuplicateGroupWidget, DuplicateImageWidget
+    except ImportError as e:
+        print(f"无法导入测试模块: {e}")
+        sys.exit(1)
 
 
 class TestDuplicateGroupWidget(unittest.TestCase):
@@ -149,7 +152,7 @@ class TestDuplicateImageWidget(unittest.TestCase):
     def test_widget_creation(self):
         """测试控件创建"""
         # 使用mock避免实际文件访问
-        with patch('results_panel.ImageUtils.get_thumbnail'):
+        with patch('modules.deduplication.results_panel.ImageUtils.get_thumbnail'):
             widget = DuplicateImageWidget('test.jpg', 100, 100)
             
             # 验证控件属性

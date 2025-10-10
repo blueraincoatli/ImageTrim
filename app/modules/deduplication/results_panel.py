@@ -13,9 +13,157 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushBut
                              QSlider, QRubberBand)
 from PyQt6.QtWidgets import QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QCoreApplication, QEvent, QPoint, QRect
-from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen, QScreen
+from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen, QScreen, QCursor
 from utils.image_utils import ImageUtils
 from utils.ui_helpers import UIHelpers
+
+
+class ClickablePathLabel(QLabel):
+    """可点击的路径标签"""
+    
+    def __init__(self, path: str, parent=None):
+        super().__init__(path, parent)
+        self.path = path
+        self.setStyleSheet("""
+            QLabel {
+                color: #FFFFFF;
+                font-family: Consolas, Monaco, 'Courier New', monospace;
+                font-size: 12px;
+                background-color: rgba(60, 60, 60, 200);
+                padding: 2px;
+                border-radius: 3px;
+                border: none;
+                margin: 0px;
+            }
+        """)
+        self.setWordWrap(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._tooltip_parent = None
+        
+    def set_tooltip_parent(self, tooltip_parent):
+        """设置悬浮框父级，用于保持显示"""
+        self._tooltip_parent = tooltip_parent
+        
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.open_file_location()
+        super().mousePressEvent(event)
+        
+    def enterEvent(self, event):
+        """鼠标进入事件 - 保持悬浮框显示"""
+        # 防止悬浮框在鼠标移动到链接上时消失
+        if self._tooltip_parent:
+            # 重置悬浮框的隐藏定时器
+            pass
+        super().enterEvent(event)
+        
+    def leaveEvent(self, event):
+        """鼠标离开事件 - 保持悬浮框显示"""
+        # 鼠标离开链接时不需要特殊处理
+        super().leaveEvent(event)
+        
+    def open_file_location(self):
+        """在文件管理器中打开文件所在文件夹并选中文件"""
+        try:
+            import subprocess
+            import platform
+            import os
+            from PyQt6.QtWidgets import QMessageBox
+            
+            # 规范化路径格式，确保在所有系统上都能正确处理
+            normalized_path = os.path.normpath(self.path)
+            print(f"原始路径: {self.path}")
+            print(f"规范化路径: {normalized_path}")
+            
+            if not os.path.exists(normalized_path):
+                print(f"文件不存在: {normalized_path}")
+                QMessageBox.warning(None, "文件不存在", f"指定的文件不存在:\n{normalized_path}")
+                return
+                
+            system = platform.system()
+            print(f"系统类型: {system}, 文件路径: {normalized_path}")
+            
+            success = False
+            if system == "Windows":
+                # Windows: 使用explorer /select命令选中文件
+                print(f"执行命令: explorer /select, {normalized_path}")
+                # Windows explorer命令的行为比较特殊，总是会打开文件夹窗口
+                # 我们直接执行命令，不检查返回值
+                try:
+                    subprocess.Popen(['explorer', '/select,', normalized_path])
+                    success = True
+                except Exception as e:
+                    print(f"Windows命令执行异常: {e}")
+                    # 备用方案：直接打开文件夹
+                    folder = os.path.dirname(normalized_path)
+                    print(f"备用方案 - 打开文件夹: {folder}")
+                    subprocess.Popen(['explorer', folder])
+                    success = True  # 备用方案也算成功
+            elif system == "Darwin":  # macOS
+                # macOS: 使用open -R命令
+                print(f"执行命令: open -R {normalized_path}")
+                result = subprocess.run(['open', '-R', normalized_path], capture_output=True, text=True)
+                success = result.returncode == 0
+                if not success:
+                    print(f"macOS命令执行失败: {result.stderr}")
+                    QMessageBox.warning(None, "打开失败", f"无法在Finder中打开文件位置:\n{normalized_path}\n错误: {result.stderr}")
+            else:  # Linux和其他Unix-like系统
+                # Linux: 打开文件所在文件夹（大多数文件管理器不支持直接选中文件）
+                folder = os.path.dirname(normalized_path)
+                print(f"执行命令: xdg-open {folder}")
+                result = subprocess.run(['xdg-open', folder], capture_output=True, text=True)
+                success = result.returncode == 0
+                if not success:
+                    print(f"Linux命令执行失败: {result.stderr}")
+                    QMessageBox.warning(None, "打开失败", f"无法在文件管理器中打开文件夹:\n{folder}\n错误: {result.stderr}")
+                
+        except Exception as e:
+            print(f"打开文件位置失败: {e}")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(None, "错误", f"打开文件位置时发生错误:\n{str(e)}")
+
+
+class ImagePathTooltip(QFrame):
+    """图片路径提示工具窗口"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setStyleSheet("""
+            QFrame {
+                background-color: rgba(40, 40, 40, 255);
+                border: 1px solid #888888;
+                border-radius: 6px;
+                padding: 8px;
+            }
+        """)
+        self.setMouseTracking(True)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+        
+        self.path_labels = []
+        
+    def show_paths(self, paths: List[str]):
+        """显示路径列表"""
+        # 清除现有标签
+        for label in self.path_labels:
+            label.setParent(None)
+        self.path_labels.clear()
+        
+        # 为每个路径创建可点击的标签
+        for path in paths:
+            label = ClickablePathLabel(path)
+            label.set_tooltip_parent(self)  # 设置父级引用，用于保持显示
+            # 确保标签没有额外的布局边距
+            label.setContentsMargins(0, 0, 0, 0)
+            self.layout().addWidget(label)
+            self.path_labels.append(label)
+            
+        # 调整窗口大小
+        self.adjustSize()
 
 
 class ImageViewerDialog(QDialog):
@@ -225,6 +373,7 @@ class DuplicateImageWidget(QFrame):
         self.group_widget: Optional["DuplicateGroupWidget"] = None
         self._image_cache = None
         self._thumbnail_signal_connected = False
+        self._tooltip = None
         self.init_ui()
 
     def init_ui(self):
@@ -396,6 +545,55 @@ class DuplicateImageWidget(QFrame):
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
         self.image_double_clicked.emit(self.file_path)
+        
+    def enterEvent(self, event):
+        """鼠标进入事件 - 显示路径提示"""
+        if self.file_path:
+            # 创建工具提示窗口
+            if not self._tooltip:
+                self._tooltip = ImagePathTooltip(self)
+            
+            # 显示路径
+            self._tooltip.show_paths([self.file_path])
+            
+            # 获取全局位置（更靠近鼠标位置）
+            mouse_pos = QCursor.pos()
+            tooltip_width = self._tooltip.width() if self._tooltip.width() > 0 else 300
+            tooltip_height = self._tooltip.height() if self._tooltip.height() > 0 else 100
+            
+            # 将提示窗口定位在鼠标右上方附近，避免被鼠标遮挡
+            screen = QCoreApplication.instance().primaryScreen()
+            if screen:
+                screen_geometry = screen.availableGeometry()
+                # 计算最佳位置，避免超出屏幕边界
+                x = min(mouse_pos.x() + 10, screen_geometry.right() - tooltip_width - 10)
+                y = max(mouse_pos.y() - tooltip_height - 10, screen_geometry.top() + 10)
+                self._tooltip.move(x, y)
+            else:
+                # 如果无法获取屏幕信息，使用简单定位
+                self._tooltip.move(mouse_pos.x() + 10, mouse_pos.y() - 50)
+            self._tooltip.show()
+            
+        super().enterEvent(event)
+        
+    def leaveEvent(self, event):
+        """鼠标离开事件 - 隐藏路径提示"""
+        if self._tooltip:
+            # 延迟隐藏，让用户有时间点击路径
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(800, self._hide_tooltip)
+        super().leaveEvent(event)
+        
+    def _hide_tooltip(self):
+        """延迟隐藏提示框"""
+        if self._tooltip:
+            # 检查鼠标是否在提示框或其子元素上
+            if self._tooltip.underMouse():
+                # 如果鼠标在提示框上，延迟再次检查
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(200, self._hide_tooltip)
+                return
+            self._tooltip.hide()
 
 
 class DuplicateGroupWidget(QFrame):
@@ -437,6 +635,7 @@ class DuplicateGroupWidget(QFrame):
         self.stack_widget: Optional[QFrame] = None
         self.badge_label: Optional[QLabel] = None
         self.card_height = 0
+        self._tooltip = None
         self.init_ui()
 
     def init_ui(self):
