@@ -475,19 +475,19 @@ class DuplicateGroupWidget(QFrame):
         if self.images_layout is None or self.stack_widget is None:
             return
 
-        # 使用更合理的卡片高度比例
-        self.card_height = max(120, int(card_width / 2))  # 2:1比例
+        # 使用更合理的卡片高度比例，保持2:1比例
+        self.card_height = max(80, int(card_width / 2))  # 2:1比例，最小高度80px
         self.setFixedHeight(self.card_height)
 
-        # 设置合理的内边距和间距
-        padding = max(12, int(self.card_height / 10))
-        spacing = max(6, int(self.card_height / 20))
+        # 设置合理的内边距和间距，与卡片高度成比例
+        padding = max(8, int(self.card_height / 10))
+        spacing = max(4, int(self.card_height / 20))
         self.images_layout.setContentsMargins(padding, padding, padding, padding)
         self.images_layout.setSpacing(spacing)
 
         # 计算可用空间
-        stack_width = max(100, card_width - 2 * padding)
-        stack_height = max(100, self.card_height - 2 * padding)
+        stack_width = max(60, card_width - 2 * padding)
+        stack_height = max(60, self.card_height - 2 * padding)
         self.stack_widget.setFixedSize(stack_width, stack_height)
 
         # 确保图片控件数量正确
@@ -525,9 +525,9 @@ class DuplicateGroupWidget(QFrame):
             # 只有一张图片，居中显示
             if self.image_widgets:
                 widget = self.image_widgets[0]
-                # 使用卡片的大部分空间
-                thumb_width = max(80, stack_width - 20)
-                thumb_height = max(80, stack_height - 20)
+                # 使用卡片的大部分空间，与卡片尺寸成比例
+                thumb_width = max(60, int(stack_width * 0.8))
+                thumb_height = max(60, int(stack_height * 0.8))
                 widget.update_thumbnail_size(thumb_width, thumb_height)
                 # 居中放置
                 x_pos = max(0, (stack_width - thumb_width) // 2)
@@ -540,21 +540,21 @@ class DuplicateGroupWidget(QFrame):
             # 两张图片并列显示，使用更多空间
             if len(self.image_widgets) >= 2:
                 # 计算每个图片的尺寸，使用更多可用空间
-                thumb_width = max(80, (stack_width - spacing) // 2 - 10)
-                thumb_height = max(80, stack_height - 20)
+                thumb_width = max(50, int((stack_width - spacing) * 0.45))
+                thumb_height = max(50, int(stack_height * 0.8))
                 
                 # 第一张图片放在左边
                 widget1 = self.image_widgets[0]
                 widget1.update_thumbnail_size(thumb_width, thumb_height)
                 y_pos = max(0, (stack_height - thumb_height) // 2)
-                widget1.move(10, y_pos)  # 左边距10px
+                widget1.move(int(stack_width * 0.05), y_pos)  # 左边距5%宽度
                 widget1.show()
                 widget1.raise_()
                 
                 # 第二张图片放在右边
                 widget2 = self.image_widgets[1]
                 widget2.update_thumbnail_size(thumb_width, thumb_height)
-                x_pos = max(0, stack_width - thumb_width - 10)  # 右边距10px
+                x_pos = max(0, stack_width - thumb_width - int(stack_width * 0.05))  # 右边距5%宽度
                 y_pos = max(0, (stack_height - thumb_height) // 2)
                 widget2.move(x_pos, y_pos)
                 widget2.show()
@@ -564,13 +564,13 @@ class DuplicateGroupWidget(QFrame):
             # 三张或更多图片：第一张单独显示，其余堆叠显示
             # 第一张图片放在左边，使用更多空间
             if len(self.image_widgets) >= 1:
-                thumb_width = max(80, (stack_width - spacing) // 2 - 15)
-                thumb_height = max(80, stack_height - 20)
+                thumb_width = max(50, int((stack_width - spacing) * 0.4))
+                thumb_height = max(50, int(stack_height * 0.8))
                 
                 widget1 = self.image_widgets[0]
                 widget1.update_thumbnail_size(thumb_width, thumb_height)
                 y_pos = max(0, (stack_height - thumb_height) // 2)
-                widget1.move(10, y_pos)  # 左边距10px
+                widget1.move(int(stack_width * 0.05), y_pos)  # 左边距5%宽度
                 widget1.show()
                 widget1.raise_()
             
@@ -578,18 +578,18 @@ class DuplicateGroupWidget(QFrame):
             remaining_count = len(self.files) - 1
             if remaining_count > 0:
                 # 右侧区域使用剩余空间
-                right_area_width = max(80, stack_width - thumb_width - spacing - 20)
-                right_area_height = max(80, stack_height - 20)
-                right_area_x = thumb_width + spacing + 10
+                right_area_width = max(50, int(stack_width * 0.5))
+                right_area_height = max(50, int(stack_height * 0.8))
+                right_area_x = stack_width - right_area_width - int(stack_width * 0.05)
                 right_area_y = max(0, (stack_height - right_area_height) // 2)
                 
                 # 堆叠图片的最大显示数量
                 max_display = min(remaining_count, 5)
-                overlap = min(max(10, right_area_width // 12), 25)
+                overlap = min(max(5, int(right_area_width // 15)), 20)
                 
                 # 计算堆叠图片的尺寸
-                stacked_thumb_width = max(60, right_area_width - overlap * (max_display - 1) - 10)
-                stacked_thumb_height = max(60, right_area_height - 10)
+                stacked_thumb_width = max(40, right_area_width - overlap * (max_display - 1) - 10)
+                stacked_thumb_height = max(40, right_area_height - 10)
                 
                 base_x = right_area_x + max(0, (right_area_width - stacked_thumb_width - overlap * (max_display - 1)) // 2)
                 base_y = right_area_y + max(0, (right_area_height - stacked_thumb_height) // 2)
@@ -1509,127 +1509,7 @@ class DeduplicationResultsPanel(QWidget):
             group_widget.update_thumbnails(column_width)
             # 刷新缩略图显示
             group_widget.refresh_thumbnails()
-
-    def on_splitter_moved(self, pos, index):
-        """处理分割器移动事件"""
-        # 当分割器移动时，更新网格布局
-        self.update_grid_layout()
-
-    def update_grid_layout(self):
-        """更新网格布局"""
-        if not self.duplicate_groups:
-            return
-
-        try:
-            # 使用滑块定义的列数
-            columns = self.grid_size  # 直接使用用户设置的列数
-
-            # 获取容器宽度和网格布局参数
-            container_width = self.scroll_area.viewport().width()
-            if container_width <= 0:
-                return  # 避免除零错误
-
-            # 获取网格布局的间距和边距
-            grid_spacing = self.grid_layout.spacing()  # 网格间距（默认10px）
-            margins = self.grid_layout.contentsMargins()
-            left_margin = margins.left()
-            right_margin = margins.right()
-            top_margin = margins.top()
-            bottom_margin = margins.bottom()
-            total_horizontal_margin = left_margin + right_margin
-            total_spacing_width = grid_spacing * (columns - 1)  # 列间距总数
-
-            # 考虑DPI缩放因子调整容器宽度
-            scaled_container_width = int(container_width / self.dpi_scale_factor)
-
-            # 计算实际可用的宽度（容器宽度 - 边距 - 间距）
-            available_width = scaled_container_width - total_horizontal_margin - total_spacing_width
-
-            # 计算每列的实际可用宽度
-            if available_width <= 0:
-                print(f"DPI调试: 警告 - 可用宽度为负数或零: available_width={available_width}, 跳过布局更新")
-                return  # 避免负数或零宽度
-
-            # 确保最小列宽
-            min_column_width = 100  # 最小列宽100px
-            if available_width < columns * min_column_width:
-                print(f"DPI调试: 警告 - 可用宽度不足以显示{columns}列, 最小需要{columns * min_column_width}px, 实际{available_width}px")
-                # 自动减少列数以适应可用宽度
-                columns = max(1, available_width // min_column_width)
-                total_spacing_width = grid_spacing * (columns - 1)
-                available_width = scaled_container_width - total_horizontal_margin - total_spacing_width
-                print(f"DPI调试: 自动调整列数为{columns}, 新的可用宽度={available_width}px")
-
-            actual_column_width = available_width // columns
-
-            # 为了显示实际值，我们也保存原始逻辑宽度
-            logical_container_width = container_width
-            logical_available_width = logical_container_width - total_horizontal_margin - total_spacing_width
-            logical_column_width = logical_available_width // columns
-
-            print(f"DPI调试: 更新布局 - 列数={columns}, 容器宽度={container_width}, 缩放容器宽度={scaled_container_width}")
-            print(f"DPI调试: 网格参数 - 左边距={left_margin}px, 右边距={right_margin}px, 总边距={total_horizontal_margin}px, 网格间距={grid_spacing}px, 总间距={total_spacing_width}px")
-            print(f"DPI调试: 可用宽度 - 缩放可用={available_width}px, 逻辑可用={logical_available_width}px")
-            print(f"DPI调试: 最终列宽 - 缩放列宽={actual_column_width}px, 逻辑列宽={logical_column_width}px, DPI缩放因子={self.dpi_scale_factor}")
-
-            # 清除现有的行和列拉伸因子
-            for i in range(self.grid_layout.rowCount()):
-                self.grid_layout.setRowStretch(i, 0)
-            for i in range(self.grid_layout.columnCount()):
-                self.grid_layout.setColumnStretch(i, 0)
-
-            # 清除现有布局中的所有控件
-            for i in reversed(range(self.grid_layout.count())):
-                widget = self.grid_layout.itemAt(i).widget()
-                if widget:
-                    self.grid_layout.removeWidget(widget)
-
-            # 重新添加所有卡片到网格布局，并更新每个卡片的尺寸
-            for i, group_widget in enumerate(self.duplicate_groups):
-                # 计算新位置
-                row = i // columns
-                col = i % columns
-
-                # 添加到新位置，居中对齐
-                self.grid_layout.addWidget(group_widget, row, col, Qt.AlignmentFlag.AlignCenter)
-
-                # 更新这个重复组卡片的宽度并重新计算内部图片大小
-                self.update_group_widget_size(group_widget, actual_column_width)
-
-            # 设置每列的固定宽度，使用实际计算的列宽
-            for i in range(columns):
-                self.grid_layout.setColumnStretch(i, 1)
-                self.grid_layout.setColumnMinimumWidth(i, actual_column_width)
-
-            # 清除多余的列拉伸因子，避免影响布局
-            for i in range(columns, self.grid_layout.columnCount()):
-                self.grid_layout.setColumnStretch(i, 0)
-
-            # 添加一个可伸展的空白行，确保内容从顶部开始排列并可以正常滚动
-            rows = (len(self.duplicate_groups) + columns - 1) // columns
-            if rows > 0:
-                # 在最后一行添加一个伸展因子，确保可以滚动
-                self.grid_layout.setRowStretch(rows, 1)
-
-            # 更新状态信息，显示当前布局信息
-            if hasattr(self, 'status_label'):
-                current_status = self.status_label.text()
-                if "找到" in current_status:
-                    # 保留"找到 X 组重复图片"的信息，更新布局信息
-                    base_status = current_status.split('|')[0].strip()
-                    if self.dpi_scale_factor != 1.0:
-                        self.status_label.setText(f"{base_status} | 布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px | DPI缩放: {self.dpi_scale_factor:.2f}x")
-                    else:
-                        self.status_label.setText(f"{base_status} | 布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px")
-                else:
-                    # 如果没有找到重复图片的信息，只显示布局信息
-                    if self.dpi_scale_factor != 1.0:
-                        self.status_label.setText(f"布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px | DPI缩放: {self.dpi_scale_factor:.2f}x")
-                    else:
-                        self.status_label.setText(f"布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px")
-
-        except Exception as e:
-            # 捕获并记录布局更新时的错误
-            print(f"更新网格布局时出错: {str(e)}")
-            if hasattr(self, 'status_label'):
-                self.status_label.setText("布局更新出错，请尝试调整窗口大小或更改列数")
+            
+            # 强制更新布局以确保正确显示
+            group_widget.updateGeometry()
+            group_widget.update()
