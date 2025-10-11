@@ -5,6 +5,8 @@
 
 from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFrame
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
+from pathlib import Path
 from core.function_manager import FunctionManager
 from ui.function_panel import FunctionPanel
 from ui.settings_panel import SettingsPanel
@@ -29,8 +31,13 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle("图片处理工具套件")
+        self.setWindowTitle("ImageTrim - 图片精简工具")
         self.setMinimumSize(1200, 700)
+
+        # 设置窗口图标
+        icon_path = Path(__file__).parent.parent / "resources" / "icons" / "imagetrim.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         
         # 创建主窗口部件
         central_widget = QWidget()
