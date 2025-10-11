@@ -39,23 +39,44 @@ class DeduplicationWorker(QObject):
             # 收集所有图片文件
             self.progress_updated.emit(0, "收集图片文件...")
             self.log_message.emit(f"开始扫描 {len(params['paths'])} 个路径", "info")
-            
+
             all_image_files = []
             total_files_found = 0
-            
+            total_paths = len(params['paths'])
+
             # 收集文件，同时更新进度
-            for i, path in enumerate(params['paths']):
+            for path_idx, path in enumerate(params['paths']):
                 if not self.is_running:
                     break
-                    
+
                 if os.path.exists(path):
-                    image_files = ImageUtils.get_image_files(path, params['include_subdirs'])
+                    # 创建进度回调函数，实时更新文件发现进度
+                    def file_found_callback(count):
+                        """每发现一个文件时调用"""
+                        # 计算当前路径的基础进度
+                        base_progress = path_idx / total_paths * 30
+                        # 添加当前路径内的进度（估算，每10个文件更新一次）
+                        if count % 10 == 0 or count < 10:
+                            current_progress = base_progress
+                            self.progress_updated.emit(
+                                current_progress,
+                                f"收集图片文件... 路径 {path_idx+1}/{total_paths}, 已找到 {len(all_image_files) + count} 个文件"
+                            )
+
+                    image_files = ImageUtils.get_image_files(
+                        path,
+                        params['include_subdirs'],
+                        progress_callback=file_found_callback
+                    )
                     all_image_files.extend(image_files)
                     total_files_found += len(image_files)
-                    
-                    # 更新收集文件进度
-                    progress = (i + 1) / len(params['paths']) * 30  # 收集文件占30%进度
-                    self.progress_updated.emit(progress, f"收集图片文件... {i+1}/{len(params['paths'])}")
+
+                    # 更新路径完成进度
+                    progress = (path_idx + 1) / total_paths * 30  # 收集文件占30%进度
+                    self.progress_updated.emit(
+                        progress,
+                        f"收集图片文件... {path_idx+1}/{total_paths} 路径, 已找到 {total_files_found} 个文件"
+                    )
                     self.log_message.emit(f"从 {path} 找到 {len(image_files)} 个图片文件", "info")
                 else:
                     self.log_message.emit(f"路径不存在: {path}", "error")
@@ -71,12 +92,21 @@ class DeduplicationWorker(QObject):
                 return
             
             self.log_message.emit(f"总共找到 {total_files} 个图片文件", "info")
-            
-            # 计算哈希值并查找重复项
-            self.progress_updated.emit(40, "计算图片哈希值...")
+
+            # 计算哈希值并查找重复项 - 传递进度回调和停止检查
+            def progress_callback(progress, message):
+                """进度回调函数"""
+                self.progress_updated.emit(progress, message)
+
+            def should_stop():
+                """检查是否需要停止"""
+                return not self.is_running
+
             duplicates = ImageUtils.find_duplicates(
-                all_image_files, 
-                params['threshold'] / 100.0
+                all_image_files,
+                params['threshold'] / 100.0,
+                progress_callback=progress_callback,
+                should_stop=should_stop
             )
             
             if not self.is_running:

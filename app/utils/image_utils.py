@@ -25,13 +25,14 @@ class ImageUtils:
     """
 
     @staticmethod
-    def get_image_files(path: str, include_subdirs: bool = True) -> List[str]:
+    def get_image_files(path: str, include_subdirs: bool = True, progress_callback=None) -> List[str]:
         """
         获取目录中的所有图片文件
 
         Args:
             path: 目录路径
             include_subdirs: 是否包含子目录
+            progress_callback: 进度回调函数 callback(count) 每找到一个文件调用
 
         Returns:
             List[str]: 图片文件路径列表
@@ -42,17 +43,25 @@ class ImageUtils:
         if os.path.isfile(path):
             if os.path.splitext(path)[1].lower() in image_extensions:
                 image_files.append(path)
+                if progress_callback:
+                    progress_callback(1)
         elif os.path.isdir(path):
             if include_subdirs:
                 for root, _, files in os.walk(path):
                     for file in files:
                         if os.path.splitext(file)[1].lower() in image_extensions:
                             image_files.append(os.path.join(root, file))
+                            # 每找到一个文件就回调一次
+                            if progress_callback:
+                                progress_callback(len(image_files))
             else:
                 for file in os.listdir(path):
                     file_path = os.path.join(path, file)
                     if os.path.isfile(file_path) and os.path.splitext(file)[1].lower() in image_extensions:
                         image_files.append(file_path)
+                        # 每找到一个文件就回调一次
+                        if progress_callback:
+                            progress_callback(len(image_files))
 
         return image_files
 
@@ -104,13 +113,15 @@ class ImageUtils:
         return similarity
 
     @staticmethod
-    def find_duplicates(image_files: List[str], threshold: float = 0.95) -> Dict[str, List[str]]:
+    def find_duplicates(image_files: List[str], threshold: float = 0.95, progress_callback=None, should_stop=None) -> Dict[str, List[str]]:
         """
         查找重复图片
 
         Args:
             image_files: 图片文件路径列表
             threshold: 相似度阈值
+            progress_callback: 进度回调函数 callback(progress, message)
+            should_stop: 停止检查函数 should_stop() -> bool
 
         Returns:
             Dict[str, List[str]]: 重复图片组，键为主图片路径，值为相似图片路径列表
@@ -118,26 +129,47 @@ class ImageUtils:
         if len(image_files) < 2:
             return {}
 
-        # 计算所有图片的哈希值
+        total_files = len(image_files)
+
+        # 阶段1: 计算所有图片的哈希值 (40% - 70%)
         hashes = {}
-        for file_path in image_files:
+        for idx, file_path in enumerate(image_files):
+            # 检查是否需要停止
+            if should_stop and should_stop():
+                return {}
+
             try:
                 hashes[file_path] = ImageUtils.calculate_hash(file_path)
+
+                # 更新进度
+                if progress_callback:
+                    progress = 40 + (idx + 1) / total_files * 30  # 40-70%
+                    progress_callback(progress, f"计算图片哈希值... {idx+1}/{total_files}")
+
             except Exception as e:
                 print(f"警告: 无法处理文件 {file_path}: {e}")
 
-        # 查找重复项
+        if not hashes:
+            return {}
+
+        # 阶段2: 查找重复项 (70% - 100%)
         duplicates = {}
         processed = set()
+        hash_items = list(hashes.items())
+        total_comparisons = len(hash_items)
 
-        for i, (file1, hash1) in enumerate(hashes.items()):
+        for i, (file1, hash1) in enumerate(hash_items):
+            # 检查是否需要停止
+            if should_stop and should_stop():
+                return duplicates
+
             if file1 in processed:
                 continue
 
             group = [file1]
             processed.add(file1)
 
-            for file2, hash2 in list(hashes.items())[i+1:]:
+            for file2, hash2 in hash_items[i+1:]:
                 if file2 in processed:
                     continue
 
@@ -152,6 +184,11 @@ class ImageUtils:
             # 如果组中有多个文件，则认为是重复项
             if len(group) > 1:
                 duplicates[group[0]] = group[1:]
+
+            # 更新进度
+            if progress_callback:
+                progress = 70 + (i + 1) / total_comparisons * 30  # 70-100%
+                progress_callback(progress, f"查找重复项... {i+1}/{total_comparisons}")
 
         return duplicates
 
