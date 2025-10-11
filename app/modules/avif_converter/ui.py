@@ -39,13 +39,16 @@ class AVIFConverterWorkspace(QWidget):
         self.progress_bar = QProgressBar()
         self.progress_bar.setStyleSheet("""
             QProgressBar {
-                border: 1px solid #6c757d;
+                border: 1px solid #454545;
                 border-radius: 4px;
                 text-align: center;
                 background-color: #2B2B2B;
+                color: white;
             }
             QProgressBar::chunk {
-                background-color: #28a745;
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                         stop:0 #FF8C00, stop:0.5 #FF6B35, stop:1 #FF8C00);
+                border-radius: 3px;
             }
         """)
         self.progress_bar.setValue(0)

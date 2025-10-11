@@ -23,31 +23,31 @@ class SettingsPanel(QWidget):
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
-        
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(15)
+
         # 标题
         self.title = QLabel("⚙️ 设置与进度")
         self.title.setStyleSheet("""
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             color: white;
         """)
         layout.addWidget(self.title)
-        
-        # 设置区域容器
+
+        # 设置区域容器 - 简化边框，使用阴影效果
         container = QFrame()
         container.setStyleSheet("""
             QFrame {
                 background-color: #2d2d30;
-                border: 1px solid #3f3f46;
-                border-radius: 6px;
+                border: none;
+                border-radius: 8px;
             }
         """)
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         # 设置区域
         self.stacked_widget = QStackedWidget()
         container_layout.addWidget(self.stacked_widget)

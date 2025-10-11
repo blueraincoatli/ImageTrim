@@ -787,7 +787,7 @@ class DeduplicationResultsPanel(QWidget):
         top_layout = QHBoxLayout(top_bar)
         top_layout.setContentsMargins(0, 0, 0, 0)
         
-        title = QLabel("🔍 重复图片结果")
+        title = QLabel("🔍 扫描结果")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
         top_layout.addWidget(title)
         top_layout.addStretch()
@@ -922,10 +922,12 @@ class DeduplicationResultsPanel(QWidget):
                 border-radius: 4px;
                 text-align: center;
                 background-color: #333337;
+                color: white;
             }
-            
+
             QProgressBar::chunk {
-                background-color: #0078d7;
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                         stop:0 #FF8C00, stop:0.5 #FF6B35, stop:1 #FF8C00);
                 border-radius: 3px;
             }
         """)

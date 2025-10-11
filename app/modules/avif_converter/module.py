@@ -87,6 +87,69 @@ class AVIFConverterModule(BaseFunctionModule):
         self.quality_spinbox.setRange(1, 100)
         self.quality_spinbox.setValue(self.quality)
         self.quality_spinbox.setSuffix(" %")
+        self.quality_spinbox.setStyleSheet("""
+            QSpinBox {
+                background-color: #2d2d30;
+                border: 1px solid #4C4C4C;
+                border-radius: 4px;
+                padding: 4px 8px;
+                color: white;
+                min-width: 80px;
+            }
+            QSpinBox:hover {
+                border-color: #FF8C00;
+            }
+            QSpinBox:focus {
+                border-color: #FF8C00;
+                outline: none;
+            }
+            QSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left: 1px solid #4C4C4C;
+                border-top-right-radius: 4px;
+                background-color: #3A3A3A;
+            }
+            QSpinBox::up-button:hover {
+                background-color: #4A4A4A;
+            }
+            QSpinBox::up-button:pressed {
+                background-color: #FF8C00;
+            }
+            QSpinBox::up-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-bottom: 5px solid white;
+                width: 0;
+                height: 0;
+                margin: 0px 2px;
+            }
+            QSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 20px;
+                border-left: 1px solid #4C4C4C;
+                border-bottom-right-radius: 4px;
+                background-color: #3A3A3A;
+            }
+            QSpinBox::down-button:hover {
+                background-color: #4A4A4A;
+            }
+            QSpinBox::down-button:pressed {
+                background-color: #FF8C00;
+            }
+            QSpinBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid white;
+                width: 0;
+                height: 0;
+                margin: 0px 2px;
+            }
+        """)
         quality_layout.addWidget(self.quality_spinbox)
         quality_layout.addStretch()
         settings_layout.addLayout(quality_layout)
@@ -104,6 +167,32 @@ class AVIFConverterModule(BaseFunctionModule):
         # 选项
         self.subdir_checkbox = QCheckBox("包含子目录")
         self.subdir_checkbox.setChecked(True)
+        self.subdir_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: white;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 3px;
+                border: 2px solid #4C4C4C;
+                background-color: #2d2d30;
+            }
+            QCheckBox::indicator:hover {
+                border-color: #FF8C00;
+                background-color: #3A3A3A;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #FF8C00;
+                border-color: #FF8C00;
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOSIgdmlld0JveD0iMCAwIDEyIDkiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgNEw0LjUgNy41TDExIDEiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
+            }
+            QCheckBox::indicator:checked:hover {
+                background-color: #FFA500;
+                border-color: #FFA500;
+            }
+        """)
         settings_layout.addWidget(self.subdir_checkbox)
         
         # 操作按钮

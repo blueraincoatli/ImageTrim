@@ -47,22 +47,28 @@ class FunctionCard(QPushButton):
                 text-align: left;
                 border: none;
                 border-radius: 6px;
-                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, 
-                    stop: 0 #ffcce6, stop: 0.25 #cce6ff, stop: 0.5 #ffe6cc, 
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #ffcce6, stop: 0.25 #cce6ff, stop: 0.5 #ffe6cc,
                     stop: 0.75 #e6ccff, stop: 1 #ccffe6);
                 padding: 15px;
+                outline: none;
             }
-            
+
             FunctionCard:hover {
-                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, 
-                    stop: 0 #ffddee, stop: 0.25 #ddeeff, stop: 0.5 #ffeedd, 
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #ffddee, stop: 0.25 #ddeeff, stop: 0.5 #ffeedd,
                     stop: 0.75 #eeddff, stop: 1 #ddeeef);
             }
-            
+
             FunctionCard:checked {
-                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, 
-                    stop: 0 #ff66b3, stop: 0.25 #66b3ff, stop: 0.5 #ffcc66, 
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #ff66b3, stop: 0.25 #66b3ff, stop: 0.5 #ffcc66,
                     stop: 0.75 #cc66ff, stop: 1 #66ffcc);
+            }
+
+            FunctionCard:focus {
+                outline: none;
+                border: none;
             }
         """)
 
