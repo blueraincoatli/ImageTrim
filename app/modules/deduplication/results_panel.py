@@ -7,7 +7,7 @@ import os
 import shutil
 from typing import Dict, List, Optional, Set, Tuple
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-                             QTextEdit, QScrollArea, QGridLayout, QProgressBar,
+                             QTextEdit, QScrollArea, QGridLayout,
                              QFrame, QCheckBox, QSplitter, QFileDialog, QMessageBox,
                              QApplication, QDialog, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
                              QSlider, QRubberBand)
@@ -16,6 +16,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QCoreApplication, QEvent, QPoin
 from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen, QScreen, QCursor
 from utils.image_utils import ImageUtils
 from utils.ui_helpers import UIHelpers
+from ui.animated_progress_bar import AnimatedProgressBar
 
 
 class ClickablePathLabel(QLabel):
@@ -911,26 +912,11 @@ class DeduplicationResultsPanel(QWidget):
         """)
         top_layout.addWidget(self.grid_size_value_label)
 
-        # 进度条
-        self.progress_bar = QProgressBar()
+        # 进度条（使用带动画的进度条）
+        self.progress_bar = AnimatedProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("准备就绪")
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #454545;
-                border-radius: 4px;
-                text-align: center;
-                background-color: #333337;
-                color: white;
-            }
-
-            QProgressBar::chunk {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                                         stop:0 #FF8C00, stop:0.5 #FF6B35, stop:1 #FF8C00);
-                border-radius: 3px;
-            }
-        """)
         
         # 状态标签
         self.status_label = QLabel("准备就绪")
@@ -1159,9 +1145,8 @@ class DeduplicationResultsPanel(QWidget):
         self.update_grid_layout()
             
     def update_progress(self, value: float, message: str):
-        """更新进度"""
-        self.progress_bar.setValue(int(value))
-        self.progress_bar.setFormat(f"{message} ({int(value)}%)")
+        """更新进度（带平滑动画）"""
+        self.progress_bar.updateProgress(value, message)
         self.status_label.setText(message)
         
     def add_log_message(self, message: str, level: str):

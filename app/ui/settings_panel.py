@@ -3,9 +3,13 @@
 设置面板
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QStackedWidget, QFrame
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QStackedWidget,
+                             QFrame, QGraphicsDropShadowEffect)
+from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt
 from core.function_manager import FunctionManager
 from core.base_module import BaseFunctionModule
+from ui.theme import Theme, Spacing, Shadow, BorderRadius
 
 
 class SettingsPanel(QWidget):
@@ -38,13 +42,22 @@ class SettingsPanel(QWidget):
 
         # 设置区域容器 - 简化边框，使用阴影效果
         container = QFrame()
-        container.setStyleSheet("""
-            QFrame {
-                background-color: #2d2d30;
+        container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {Theme.BG_MEDIUM};
                 border: none;
-                border-radius: 8px;
-            }
+                border-radius: {BorderRadius.LG}px;
+            }}
         """)
+
+        # 添加阴影效果到容器
+        blur_radius, color_rgba, offset_x, offset_y = Shadow.panel_shadow()
+        panel_shadow = QGraphicsDropShadowEffect()
+        panel_shadow.setBlurRadius(blur_radius)
+        panel_shadow.setColor(QColor(color_rgba))
+        panel_shadow.setOffset(offset_x, offset_y)
+        container.setGraphicsEffect(panel_shadow)
+
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
 

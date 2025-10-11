@@ -1,15 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)",
-      "Bash(dir:*)",
-      "Bash(pip install:*)",
-      "Bash(copy:*)",
-      "Bash(pyinstaller:*)",
-      "Bash(D:/cleanPython/python.exe --version)",
-      "Bash(D:/cleanPython/python.exe:*)",
-      "Bash(find:*)",
-      "Bash(git add:*)"
+      "Bash(python -m app.main)",
+      "Bash(git add -A)"
     ],
     "deny": [],
     "ask": []
