@@ -181,6 +181,23 @@ jobs:
           fi
         fi
 
+    - name: Create archives
+      run: |
+        mkdir -p archives
+        cd dist
+        for file in *; do
+          if [ -f "$file" ]; then
+            if [ "${{ matrix.platform }}" = "windows" ]; then
+              # Create ZIP for Windows
+              zip "../archives/${file}.zip" "$file"
+            else
+              # Create tar.gz for macOS and Linux
+              tar -czf "../archives/${file}.tar.gz" "$file"
+            fi
+          fi
+        done
+        cd ..
+
     - name: Create DMG (macOS)
       if: matrix.platform == 'macos'
       run: |
@@ -188,7 +205,7 @@ jobs:
           mkdir -p dmg_temp
           cp -R "dist/ImageTrim.app" dmg_temp/
           ln -s /Applications dmg_temp/Applications
-          hdiutil create -volname "ImageTrim" -srcfolder dmg_temp -ov -format UDZO ImageTrim-1.0.0-macos.dmg
+          hdiutil create -volname "ImageTrim" -srcfolder dmg_temp -ov -format UDZO ImageTrim-1.1.1-macos.dmg
           rm -rf dmg_temp
         fi
 
@@ -217,55 +234,13 @@ jobs:
       with:
         path: artifacts
 
-    - name: Delete existing Release (if exists)
+    - name: Build Summary
       run: |
-        TAG_NAME="${GITHUB_REF#refs/tags/}"
-        if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-          echo "Deleting existing release: $TAG_NAME"
-          gh release delete "$TAG_NAME" --yes
-        fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Create/Update Release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          artifacts/windows-build/dist/*.exe
-          artifacts/windows-build/archives/*.zip
-          artifacts/macos-build/dist/*.app/**
-          artifacts/macos-build/archives/*.tar.gz
-          artifacts/macos-build/*.dmg
-          artifacts/linux-build/dist/imagetrim
-          artifacts/linux-build/archives/*.tar.gz
-          artifacts/linux-build/*.AppImage
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-        name: "ImageTrim ${{ github.ref_name }}"
-        body: |
-          ## ImageTrim ${{ github.ref_name }} Release
-
-          ### Main Features
-          - Image deduplication functionality
-          - AVIF format conversion
-          - Modern UI interface
-
-          ### Cross-Platform Support
-          - macOS application bundle (.app)
-          - Linux executable and AppImage
-
-          ### Download Files
-          - **Windows**: `ImageTrim.exe`
-          - **macOS**: `ImageTrim.app` or `.dmg` installer package
-          - **Linux**: `imagetrim` executable or `.AppImage`
-
-          ### Usage Instructions
-          1. Download the file for your platform
-          2. Windows/macOS: Double-click to run
-          3. Linux: `chmod +x imagetrim && ./imagetrim`
-
-          ---
-          Automatically built with GitHub Actions
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        echo "=== Build Summary ==="
+        echo "All builds completed successfully!"
+        echo ""
+        echo "Available artifacts:"
+        ls -la artifacts/ || echo "No archives found"
+        ls -la dist/ || echo "No dist files found"
+        echo ""
+        echo "Download the files from the Actions tab above."
