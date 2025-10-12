@@ -163,8 +163,33 @@ jobs:
         wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
         chmod +x appimagetool
 
-        # Create AppImage
-        ./appimagetool ImageTrim.AppDir ImageTrim-1.0.6-linux.AppImage
+        # Verify desktop file exists
+        echo "Checking desktop file location:"
+        ls -la ImageTrim.AppDir/usr/share/applications/
+        echo "Checking AppDir structure:"
+        ls -la ImageTrim.AppDir/
+
+        # Create desktop file also at root level (some versions of appimagetool require this)
+        cp ImageTrim.AppDir/usr/share/applications/imagetrim.desktop ImageTrim.AppDir/imagetrim.desktop
+
+        echo "Creating AppImage with verbose output..."
+        ./appimagetool --verbose ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage || {
+          echo "AppImage creation failed, trying alternative approach..."
+          # Try without desktop file requirement
+          ./appimagetool --no-appstream ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage || {
+            echo "Final attempt: creating AppImage manually..."
+            # Create a simple AppImage without desktop integration
+            mkdir -p ImageTrim.AppDir/usr/bin
+            cat > ImageTrim.AppDir/AppRun << 'APPRUNEOF'
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "${0}")")"
+export PATH="${HERE}/usr/bin:${PATH}"
+exec "${HERE}/usr/bin/imagetrim" "$@"
+APPRUNEOF
+            chmod +x ImageTrim.AppDir/AppRun
+            ./appimagetool --no-appstream ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage
+          }
+        }
 
     - name: Create DMG (macOS)
       if: matrix.platform == 'macos'
