@@ -6,8 +6,10 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                              QSplitter, QFrame, QStatusBar, QLabel, QPushButton)
 from PyQt6.QtCore import Qt, QPoint, QTimer
-from PyQt6.QtGui import QIcon, QCursor
+from PyQt6.QtGui import QIcon, QCursor, QPixmap
 from pathlib import Path
+import sys
+import os
 from app.core.function_manager import FunctionManager
 from app.ui.function_panel import FunctionPanel
 from app.ui.settings_panel import SettingsPanel
@@ -50,9 +52,18 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1200, 700)
 
         # 设置窗口图标
-        icon_path = Path(__file__).parent.parent / "resources" / "icons" / "imagetrim.ico"
-        if icon_path.exists():
-            self.setWindowIcon(QIcon(str(icon_path)))
+        icon_path = self.get_resource_path("icons/imagetrim.ico")
+        print(f"主窗口尝试加载图标: {icon_path}")
+
+        if icon_path and Path(icon_path).exists():
+            icon = QIcon(str(icon_path))
+            if not icon.isNull():
+                self.setWindowIcon(icon)
+                print("主窗口图标加载成功")
+            else:
+                print("主窗口图标无效")
+        else:
+            print(f"主窗口图标文件不存在: {icon_path}")
 
         # 启用无边框窗口样式（保留阴影）
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
@@ -174,13 +185,24 @@ class MainWindow(QMainWindow):
         title_layout.setSpacing(Spacing.SM)
 
         # 应用图标和标题
-        icon_path = Path(__file__).parent.parent / "resources" / "icons" / "imagetrim.ico"
-        if icon_path.exists():
+        icon_path = self.get_resource_path("icons/imagetrim.ico")
+        print(f"标题栏尝试加载图标: {icon_path}")
+
+        if icon_path and Path(icon_path).exists():
             icon_label = QLabel()
             icon = QIcon(str(icon_path))
-            pixmap = icon.pixmap(16, 16)
-            icon_label.setPixmap(pixmap)
-            title_layout.addWidget(icon_label)
+            if not icon.isNull():
+                pixmap = icon.pixmap(16, 16)
+                if not pixmap.isNull():
+                    icon_label.setPixmap(pixmap)
+                    title_layout.addWidget(icon_label)
+                    print("标题栏图标加载成功")
+                else:
+                    print("标题栏像素图无效")
+            else:
+                print("标题栏图标无效")
+        else:
+            print(f"标题栏图标文件不存在: {icon_path}")
 
         title_label = QLabel("ImageTrim - 图片精简工具")
         title_label.setStyleSheet(f"""
@@ -300,17 +322,44 @@ class MainWindow(QMainWindow):
         """)
         status_bar.addWidget(self.status_message)
 
-        # 右侧关于信息（可点击）
+        # 右侧关于信息（可点击）- 包含图标
+        about_container = QWidget()
+        about_layout = QHBoxLayout(about_container)
+        about_layout.setContentsMargins(0, 0, 0, 0)
+        about_layout.setSpacing(Spacing.XS)
+
+        # 添加小图标
+        icon_label = QLabel()
+        icon_path = self.get_resource_path("icons/imagetrim.ico")
+        if icon_path and os.path.exists(icon_path):
+            pixmap = QPixmap(icon_path)
+            if not pixmap.isNull():
+                # 缩放到16x16适合状态栏
+                scaled_pixmap = pixmap.scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatio,
+                                              Qt.TransformationMode.SmoothTransformation)
+                icon_label.setPixmap(scaled_pixmap)
+            else:
+                icon_label.setText("📋")
+                icon_label.setStyleSheet(f"font-size: 12px;")
+        else:
+            icon_label.setText("📋")
+            icon_label.setStyleSheet(f"font-size: 12px;")
+
+        # 版权文本
         about_label = QLabel("小红书: 919722379 | © 2025 ImageTrim")
         about_label.setStyleSheet(f"""
             color: {Theme.TEXT_DISABLED};
             font-size: {FontSize.SMALL}pt;
             padding-right: {Spacing.SM}px;
         """)
-        about_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        about_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        about_label.mousePressEvent = lambda e: self.show_about_dialog()
-        status_bar.addPermanentWidget(about_label)
+
+        # 设置点击事件
+        about_container.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        about_container.mousePressEvent = lambda e: self.show_about_dialog()
+
+        about_layout.addWidget(icon_label)
+        about_layout.addWidget(about_label)
+        status_bar.addPermanentWidget(about_container)
 
     def show_about_dialog(self):
         """显示关于对话框"""
@@ -460,3 +509,28 @@ class MainWindow(QMainWindow):
             print("触发分割器比例重新设置...")
             # 使用单次定时器延迟执行，避免频繁调整
             QTimer.singleShot(100, self.set_splitter_ratio)
+
+    def get_resource_path(self, relative_path):
+        """获取资源文件的绝对路径，支持PyInstaller打包环境"""
+        try:
+            # PyInstaller创建临时文件夹，将路径存储在_MEIPASS中
+            base_path = sys._MEIPASS
+        except Exception:
+            # 开发环境
+            base_path = os.path.abspath(".")
+
+        # 尝试多个可能的路径
+        possible_paths = [
+            os.path.join(base_path, relative_path),
+            os.path.join(base_path, "resources", relative_path),
+            os.path.join(base_path, "app", "resources", relative_path),
+            os.path.join(".", "app", "resources", relative_path),
+            os.path.join(".", "resources", relative_path),
+            os.path.join(".", relative_path)
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                return path
+
+        return None

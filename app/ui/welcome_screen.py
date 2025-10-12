@@ -19,31 +19,34 @@ class ImageLoader(QThread):
 
     def __init__(self):
         super().__init__()
-        # 定义艺术相关标签
-        self.tags = ["art", "design", "illustration", "graphic"]
-        # 生成多个随机URL以提高成功率
-        self.urls = self._generate_random_urls()
+        # 使用稳定的图片源，移除不稳定的Unsplash API
+        self.urls = self._generate_reliable_urls()
         self.current_url_index = 0
 
-    def _generate_random_urls(self):
-        """生成随机艺术图片URL"""
+    def _generate_reliable_urls(self):
+        """生成可靠的高清图片URL"""
         urls = []
 
-        # Unsplash URLs (主要选择)
-        for i in range(2):
-            selected_tags = random.sample(self.tags, random.randint(1, 2))
-            tag_string = selected_tags[0]  # 使用单个标签更稳定
-            url = f"https://source.unsplash.com/featured/1920x1080/?{tag_string}"
-            urls.append(url)
-            print(f"生成的Unsplash URL {i+1}: {url}")
+        # 使用Picsum作为主要图片源，稳定性高，速度快
+        # 添加不同种子的图片URL以获得多样化图片
+        seeds = ["nature", "architecture", "technology", "abstract", "landscape", "minimal", "gradient"]
+        selected_seed = random.choice(seeds)
 
-        # 备选的无版权图片源
+        # 主图片源
+        primary_urls = [
+            f"https://picsum.photos/seed/{selected_seed}/1920/1080.jpg",
+            f"https://picsum.photos/1920/1080?random={random.randint(1, 1000)}"
+        ]
+        urls.extend(primary_urls)
+        print(f"生成主要图片源: {len(primary_urls)} 个")
+
+        # 备用图片源（更高质量）
         backup_urls = [
-            "https://picsum.photos/1920/1080?random=1",
-            "https://images.unsplash.com/photo-1501167786227-4cba60f6d58f?w=1920&h=1080&fit=crop"
+            "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&h=1080&fit=crop",
+            "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1920&h=1080&fit=crop"
         ]
         urls.extend(backup_urls)
-        print(f"添加备选图片源: {len(backup_urls)} 个")
+        print(f"添加备用图片源: {len(backup_urls)} 个")
 
         return urls
 
@@ -51,15 +54,18 @@ class ImageLoader(QThread):
         """在后台线程加载图片"""
         print("开始加载网络图片...")
         try:
-            # 尝试所有URL直到成功
+            # 尝试所有URL直到成功，使用较短的超时时间
             for i, url in enumerate(self.urls):
                 try:
                     print(f"正在尝试加载 URL {i+1}: {url}")
                     req = urllib.request.Request(
                         url,
-                        headers={'User-Agent': 'Mozilla/5.0'}
+                        headers={
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
                     )
-                    with urllib.request.urlopen(req, timeout=15) as response:
+                    # 缩短超时时间到8秒，提高启动速度
+                    with urllib.request.urlopen(req, timeout=8) as response:
                         image_data = response.read()
                         print(f"成功下载图片数据，大小: {len(image_data)} 字节")
 
@@ -121,7 +127,7 @@ class WelcomeScreen(QWidget):
                 padding: 0;
             }}
         """)
-        self.image_label.setText("正在加载高清艺术图片...")
+        self.image_label.setText("正在加载高清背景图片...")
         layout.addWidget(self.image_label)
 
     def load_image(self):

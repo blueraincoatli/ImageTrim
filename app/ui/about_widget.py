@@ -6,6 +6,8 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
+import sys
+import os
 from pathlib import Path
 from app.ui.theme import Theme, FontSize, Spacing
 
@@ -19,6 +21,31 @@ class AboutWidget(QWidget):
         super().__init__(parent)
         self.init_ui()
 
+    def get_resource_path(self, relative_path):
+        """获取资源文件的绝对路径，支持PyInstaller打包环境"""
+        try:
+            # PyInstaller创建临时文件夹，将路径存储在_MEIPASS中
+            base_path = sys._MEIPASS
+        except Exception:
+            # 开发环境
+            base_path = os.path.abspath(".")
+
+        # 尝试多个可能的路径
+        possible_paths = [
+            os.path.join(base_path, relative_path),
+            os.path.join(base_path, "resources", relative_path),
+            os.path.join(base_path, "app", "resources", relative_path),
+            os.path.join(".", "app", "resources", relative_path),
+            os.path.join(".", "resources", relative_path),
+            os.path.join(".", relative_path)
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                return path
+
+        return None
+
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
@@ -30,36 +57,37 @@ class AboutWidget(QWidget):
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # 尝试加载用户自己的logo图标
+        # 尝试加载高精度logo图标
         icon_paths = [
-            Path(__file__).parent.parent / "resources" / "icons" / "imageTrimbg-01.svg",
-            Path(__file__).parent.parent / "resources" / "icons" / "imageTrim256px.png",
-            Path(__file__).parent.parent / "resources" / "icons" / "imagetrim_final.svg"
+            "icons/imageTrim256px.png",  # 高分辨率PNG（首选）
+            "icons/imageTrim256px.ico",   # 高分辨率ICO备用
+            "icons/imagetrim.ico",        # 标准ICO备用
+            "icons/imageTrimbg-01.svg",   # SVG备用
+            "icons/imagetrim_final.svg"   # SVG备用2
         ]
 
         icon_loaded = False
         for icon_path in icon_paths:
-            if icon_path.exists():
+            full_path = self.get_resource_path(icon_path)
+            if full_path:
                 try:
-                    if icon_path.suffix.lower() == '.svg':
-                        # SVG文件处理 - 这里简化处理为普通图标
-                        pixmap = QPixmap(str(icon_path))
-                    else:
-                        pixmap = QPixmap(str(icon_path))
-
-                    # 使用较小的尺寸
-                    scaled_pixmap = pixmap.scaled(100, 100, Qt.AspectRatioMode.KeepAspectRatio,
-                                                  Qt.TransformationMode.SmoothTransformation)
-                    icon_label.setPixmap(scaled_pixmap)
-                    icon_loaded = True
-                    break
+                    pixmap = QPixmap(full_path)
+                    if not pixmap.isNull():
+                        # 减小到原来的一半大小 (50x50)
+                        scaled_pixmap = pixmap.scaled(50, 50, Qt.AspectRatioMode.KeepAspectRatio,
+                                                      Qt.TransformationMode.SmoothTransformation)
+                        icon_label.setPixmap(scaled_pixmap)
+                        icon_loaded = True
+                        print(f"成功加载高精度logo图标: {full_path}")
+                        break
                 except Exception as e:
-                    print(f"加载图标失败 {icon_path}: {e}")
+                    print(f"加载图标失败 {full_path}: {e}")
                     continue
 
         if not icon_loaded:
             icon_label.setText("🖼️")
-            icon_label.setStyleSheet("font-size: 48px;")
+            icon_label.setStyleSheet("font-size: 20px;")  # emoji备份图标
+            print("未找到logo图标文件，使用emoji替代")
 
         layout.addWidget(icon_label)
 

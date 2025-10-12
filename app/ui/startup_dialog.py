@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QRect, pyqtSignal
 from PyQt6.QtGui import QIcon, QFont
 from pathlib import Path
+import sys
+import os
 from app.ui.theme import Theme
 
 
@@ -45,12 +47,28 @@ class StartupDialog(QDialog):
 
         # 应用图标
         icon_label = QLabel()
-        icon_path = Path(__file__).parent.parent / "resources" / "icons" / "imagetrim.ico"
-        if icon_path.exists():
-            icon_label.setPixmap(QIcon(str(icon_path)).pixmap(48, 48))
+        icon_path = self.get_resource_path("icons/imagetrim.ico")
+        print(f"尝试加载图标: {icon_path}")
+
+        if icon_path and Path(icon_path).exists():
+            icon = QIcon(str(icon_path))
+            if not icon.isNull():
+                pixmap = icon.pixmap(48, 48)
+                if not pixmap.isNull():
+                    icon_label.setPixmap(pixmap)
+                    print("图标加载成功")
+                else:
+                    icon_label.setText("🖼️")
+                    icon_label.setStyleSheet("font-size: 48px;")
+                    print("像素图无效")
+            else:
+                icon_label.setText("🖼️")
+                icon_label.setStyleSheet("font-size: 48px;")
+                print("图标无效")
         else:
             icon_label.setText("🖼️")
             icon_label.setStyleSheet("font-size: 48px;")
+            print(f"图标文件不存在: {icon_path}")
 
         header_layout.addWidget(icon_label)
 
@@ -213,5 +231,30 @@ class StartupDialog(QDialog):
 
         # 短暂延迟后自动关闭
         QTimer.singleShot(500, self.accept)
+
+    def get_resource_path(self, relative_path):
+        """获取资源文件的绝对路径，支持PyInstaller打包环境"""
+        try:
+            # PyInstaller创建临时文件夹，将路径存储在_MEIPASS中
+            base_path = sys._MEIPASS
+        except Exception:
+            # 开发环境
+            base_path = os.path.abspath(".")
+
+        # 尝试多个可能的路径
+        possible_paths = [
+            os.path.join(base_path, relative_path),
+            os.path.join(base_path, "resources", relative_path),
+            os.path.join(base_path, "app", "resources", relative_path),
+            os.path.join(".", "app", "resources", relative_path),
+            os.path.join(".", "resources", relative_path),
+            os.path.join(".", relative_path)
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                return path
+
+        return None
 
   
