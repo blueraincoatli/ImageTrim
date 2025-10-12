@@ -5,7 +5,7 @@
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                              QSplitter, QFrame, QStatusBar, QLabel, QPushButton)
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt, QPoint, QTimer
 from PyQt6.QtGui import QIcon, QCursor
 from pathlib import Path
 from app.core.function_manager import FunctionManager
@@ -13,6 +13,7 @@ from app.ui.function_panel import FunctionPanel
 from app.ui.settings_panel import SettingsPanel
 from app.ui.workspace_panel import WorkspacePanel
 from app.ui.about_dialog import AboutDialog
+from app.ui.startup_dialog import StartupDialog
 from app.ui.theme import Theme, FontSize, Spacing
 from app.modules.deduplication import DeduplicationModule
 from app.modules.avif_converter import AVIFConverterModule
@@ -29,14 +30,19 @@ class MainWindow(QMainWindow):
         self.function_panel = None
         self.settings_panel = None
         self.workspace_panel = None
+        self.startup_dialog = None
 
         # 用于窗口拖动的变量
         self.drag_position = QPoint()
 
         # 初始化时不显示窗口，等待图片加载完成
         self.setVisible(False)
-        self.init_ui()
-        self.register_modules()
+
+        # 显示启动对话框
+        self.show_startup_dialog()
+
+        # 延迟初始化UI，给启动对话框显示时间
+        QTimer.singleShot(1000, self.delayed_init)
 
     def init_ui(self):
         """初始化用户界面"""
@@ -76,8 +82,8 @@ class MainWindow(QMainWindow):
         content_layout.setSpacing(0)
 
         # 创建分割器
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        content_layout.addWidget(splitter)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        content_layout.addWidget(self.splitter)
         
         # 创建左栏框架
         left_frame = QFrame()
@@ -94,7 +100,7 @@ class MainWindow(QMainWindow):
         self.settings_panel = SettingsPanel(self.function_manager)
         left_layout.addWidget(self.settings_panel)
         
-        splitter.addWidget(left_frame)
+        self.splitter.addWidget(left_frame)
         
         # 创建右栏（工作区面板）
         self.workspace_panel = WorkspacePanel(self.function_manager)
@@ -102,10 +108,9 @@ class MainWindow(QMainWindow):
         # 连接欢迎屏幕图片加载完成信号
         self.workspace_panel.welcome_image_loaded.connect(self.on_welcome_image_loaded)
 
-        splitter.addWidget(self.workspace_panel)
+        self.splitter.addWidget(self.workspace_panel)
 
-        # 设置分割器比例
-        splitter.setSizes([int(self.width() * 0.3), int(self.width() * 0.7)])
+        # 设置分割器比例将在窗口显示后进行
 
         # 将内容布局添加到主布局
         main_layout.addLayout(content_layout)
@@ -312,20 +317,63 @@ class MainWindow(QMainWindow):
         dialog = AboutDialog(self)
         dialog.exec()
 
-    def on_welcome_image_loaded(self):
-        """欢迎屏幕图片加载完成，显示窗口"""
-        print("主窗口收到欢迎屏幕图片加载完成信号，准备显示窗口")
+    def show_startup_dialog(self):
+        """显示启动对话框"""
+        self.startup_dialog = StartupDialog(self)
+        self.startup_dialog.timeout.connect(self.on_startup_timeout)
+        self.startup_dialog.show()  # 使用show()显示非模态对话框
 
-        # 显示窗口
-        self.show()
+    def on_startup_timeout(self):
+        """启动超时处理"""
+        print("启动超时，强制显示主窗口")
+        if self.startup_dialog:
+            self.startup_dialog.close()
+        # 即使超时也要显示主窗口
+        if not self.isVisible():
+            self.show()
+            self.center_window()
 
-        # 确保窗口在屏幕中央
+    def delayed_init(self):
+        """延迟初始化UI"""
+        try:
+            self.init_ui()
+            self.register_modules()
+        except Exception as e:
+            print(f"UI初始化失败: {e}")
+            if self.startup_dialog:
+                self.startup_dialog.close()
+            # 即使初始化失败也要显示窗口
+            self.show()
+            self.center_window()
+
+    def center_window(self):
+        """居中显示窗口"""
         screen = self.screen().availableGeometry()
         x = (screen.width() - self.width()) // 2
         y = (screen.height() - self.height()) // 2
         self.move(x, y)
 
-        print("窗口已显示并居中")
+    def on_welcome_image_loaded(self):
+        """欢迎屏幕图片加载完成，显示窗口"""
+        print("主窗口收到欢迎屏幕图片加载完成信号，准备显示窗口")
+
+        # 关闭启动对话框
+        if self.startup_dialog and self.startup_dialog.isVisible():
+            self.startup_dialog.set_complete()
+
+        # 显示窗口
+        self.show()
+
+        # 确保窗口在屏幕中央
+        self.center_window()
+
+        print(f"窗口显示完成，最终大小: {self.width()}x{self.height()}")
+        print("开始设置分割器比例...")
+
+        # 设置正确的分割器比例（30/70）
+        self.set_splitter_ratio()
+
+        print("窗口已显示并居中，分割器比例已设置")
 
     def update_window_control_icons(self):
         """更新窗口控制按钮图标"""
@@ -378,3 +426,37 @@ class MainWindow(QMainWindow):
         """鼠标双击事件 - 最大化/还原"""
         if event.position().y() <= self.title_bar.height():
             self.toggle_maximize()
+
+    def set_splitter_ratio(self):
+        """设置分割器的30/70比例"""
+        if hasattr(self, 'splitter'):
+            # 设置30/70比例
+            total_width = self.width()
+            left_size = int(total_width * 0.3)
+            right_size = int(total_width * 0.7)
+
+            # 强制设置左侧面板的最小宽度，确保能够占据30%空间
+            if hasattr(self, 'function_panel'):
+                self.function_panel.setMinimumWidth(left_size)
+
+            # 设置分割器比例，并禁止面板折叠
+            self.splitter.setSizes([left_size, right_size])
+            self.splitter.setCollapsible(0, False)  # 禁止左侧面板折叠
+            self.splitter.setCollapsible(1, False)  # 禁止右侧面板折叠
+
+            print(f"分割器比例已设置为30/70: {left_size}/{right_size}")
+        else:
+            print("分割器尚未初始化")
+
+    def resizeEvent(self, event):
+        """窗口大小改变时重新设置分割器比例"""
+        old_size = event.oldSize()
+        new_size = event.size()
+        print(f"窗口大小改变: {old_size.width()}x{old_size.height()} -> {new_size.width()}x{new_size.height()}")
+
+        super().resizeEvent(event)
+        # 延迟重新设置比例，避免在初始化时干扰
+        if hasattr(self, 'splitter') and self.isVisible():
+            print("触发分割器比例重新设置...")
+            # 使用单次定时器延迟执行，避免频繁调整
+            QTimer.singleShot(100, self.set_splitter_ratio)

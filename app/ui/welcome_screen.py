@@ -134,10 +134,10 @@ class WelcomeScreen(QWidget):
     def on_image_loaded(self, pixmap):
         """图片加载完成回调"""
         if not pixmap.isNull():
-            # 加载网络图片成功
+            # 加载网络图片成功 - 保持宽高比并裁剪
             scaled_pixmap = pixmap.scaled(
                 self.size(),
-                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                 Qt.TransformationMode.SmoothTransformation
             )
             self.image_label.setPixmap(scaled_pixmap)
@@ -163,10 +163,10 @@ class WelcomeScreen(QWidget):
             if path.exists():
                 try:
                     pixmap = QPixmap(str(path))
-                    # 缩放以撑满区域
+                    # 缩放以撑满区域 - 保持宽高比并裁剪
                     scaled_pixmap = pixmap.scaled(
                         self.size(),
-                        Qt.AspectRatioMode.IgnoreAspectRatio,
+                        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                         Qt.TransformationMode.SmoothTransformation
                     )
                     self.image_label.setPixmap(scaled_pixmap)
@@ -189,11 +189,11 @@ class WelcomeScreen(QWidget):
         super().resizeEvent(event)
 
         if hasattr(self, 'image_label') and self.image_label.pixmap() and not self.image_label.pixmap().isNull():
-            # 重新缩放当前图片以适应新尺寸
+            # 重新缩放当前图片以适应新尺寸 - 保持宽高比并裁剪
             current_pixmap = self.image_label.pixmap()
             scaled_pixmap = current_pixmap.scaled(
                 self.size(),
-                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                 Qt.TransformationMode.SmoothTransformation
             )
             self.image_label.setPixmap(scaled_pixmap)

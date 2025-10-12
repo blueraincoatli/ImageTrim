@@ -27,7 +27,14 @@
       "Bash(source:*)",
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(chmod:*)",
+      "Bash(winget install:*)",
+      "Bash(choco install:*)",
+      "Bash(curl:*)",
+      "Bash(powershell:*)",
+      "Bash(zip:*)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []
