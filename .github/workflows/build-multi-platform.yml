@@ -119,13 +119,35 @@ jobs:
     - name: Create additional packages (Linux)
       if: matrix.platform == 'linux'
       run: |
+        # Check if build succeeded first
+        if [ ! -f "dist/imagetrim" ]; then
+          echo "Error: Linux binary not found in dist/"
+          ls -la dist/ || echo "dist directory not found"
+          exit 1
+        fi
+
         # Create AppImage
         mkdir -p ImageTrim.AppDir/usr/bin
         mkdir -p ImageTrim.AppDir/usr/share/applications
         mkdir -p ImageTrim.AppDir/usr/share/icons/hicolor/256x256/apps
 
         cp dist/imagetrim ImageTrim.AppDir/usr/bin/
-        cp build/linux/imagetrim.desktop ImageTrim.AppDir/usr/share/applications/
+
+        # Create desktop file directly in AppDir (don't rely on build/linux)
+        cat > ImageTrim.AppDir/usr/share/applications/imagetrim.desktop << 'EOF'
+        [Desktop Entry]
+        Name=ImageTrim
+        Name[zh_CN]=图片去重工具
+        Comment=Image deduplication and conversion tool
+        Comment[zh_CN]=图片去重和格式转换工具
+        Exec=imagetrim
+        Icon=imagetrim
+        Terminal=false
+        Type=Application
+        Categories=Graphics;Photography;
+        MimeType=image/jpeg;image/png;image/webp;image/avif;
+        StartupWMClass=ImageTrim
+        EOF
 
         # Create AppRun
         cat > ImageTrim.AppDir/AppRun << 'EOFRUN'
@@ -140,7 +162,9 @@ jobs:
         # Download appimagetool
         wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
         chmod +x appimagetool
-        ./appimagetool ImageTrim.AppDir ImageTrim-1.0.0-linux.AppImage
+
+        # Create AppImage
+        ./appimagetool ImageTrim.AppDir ImageTrim-1.0.6-linux.AppImage
 
     - name: Create DMG (macOS)
       if: matrix.platform == 'macos'
