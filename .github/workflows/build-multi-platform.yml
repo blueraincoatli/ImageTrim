@@ -189,8 +189,15 @@ jobs:
         for file in *; do
           if [ -f "$file" ]; then
             if [ "${{ matrix.platform }}" = "windows" ]; then
-              # Create ZIP for Windows
-              zip "../archives/${file}.zip" "$file"
+              # Create ZIP for Windows using Python (always available)
+              python -c "
+import zipfile
+import os
+import sys
+with zipfile.ZipFile(f'../archives/${file}.zip', 'w', zipfile.ZIP_DEFLATED) as zipf:
+    zipf.write('${file}', os.path.basename('${file}'))
+print(f'Created archive: ${file}.zip')
+              "
             else
               # Create tar.gz for macOS and Linux
               tar -czf "../archives/${file}.tar.gz" "$file"
