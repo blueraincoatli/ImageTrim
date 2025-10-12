@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="60" cy="60" r="55" fill="#1B1B1B" stroke="#FF8C00" stroke-width="2"/>
+
+  <!-- 图片框架 -->
+  <rect x="20" y="25" width="80" height="60" rx="4" fill="#2D2D30" stroke="#6c757d" stroke-width="1"/>
+
+  <!-- 图片内容 -->
+  <rect x="25" y="30" width="35" height="25" rx="2" fill="#FF8C00" opacity="0.8"/>
+  <circle cx="65" cy="42" r="8" fill="#4CAF50"/>
+  <polygon points="80,70 90,50 100,65 95,75" fill="#2196F3"/>
+
+  <!-- 裁剪角标 -->
+  <path d="M85 25 L95 25 L95 35" stroke="#FF8C00" stroke-width="2" fill="none"/>
+
+  <!-- 精简工具图标 -->
+  <text x="60" y="100" text-anchor="middle" font-family="Arial" font-size="8" fill="#FF8C00">IT</text>
+</svg>

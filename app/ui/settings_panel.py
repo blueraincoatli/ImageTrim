@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt
 from core.function_manager import FunctionManager
 from core.base_module import BaseFunctionModule
 from ui.theme import Theme, Spacing, Shadow, BorderRadius
+from ui.about_widget import AboutWidget
 
 
 class SettingsPanel(QWidget):
@@ -27,21 +28,25 @@ class SettingsPanel(QWidget):
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(15)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        layout.setSpacing(Spacing.MD)
 
         # 标题
         self.title = QLabel("⚙️ 设置与进度")
+        self.title.setObjectName("panel-title")
         self.title.setStyleSheet("""
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: white;
+            #panel-title {
+                font-size: 16px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: white;
+            }
         """)
         layout.addWidget(self.title)
 
         # 设置区域容器 - 简化边框，使用阴影效果
         container = QFrame()
+        container.setMaximumHeight(300)  # 限制最大高度，避免遮挡功能卡片
         container.setStyleSheet(f"""
             QFrame {{
                 background-color: {Theme.BG_MEDIUM};
@@ -65,6 +70,10 @@ class SettingsPanel(QWidget):
         self.stacked_widget = QStackedWidget()
         container_layout.addWidget(self.stacked_widget)
         layout.addWidget(container)
+
+        # 添加关于信息作为默认显示
+        about_widget = AboutWidget()
+        self.stacked_widget.addWidget(about_widget)
         
     def update_ui(self, module: BaseFunctionModule):
         """更新UI以显示指定模块的设置"""

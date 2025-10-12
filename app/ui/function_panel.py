@@ -34,8 +34,8 @@ class FunctionCard(QPushButton):
 
         # 创建布局
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        layout.setSpacing(Spacing.SM)
 
         # 功能图标和名称
         title_label = QLabel(f"{self.module.icon} {self.module.display_name}")
@@ -143,8 +143,8 @@ class FunctionPanel(QWidget):
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
+        layout.setSpacing(Spacing.SM)
 
         # 标题
         title = QLabel("🔧 功能选择")
@@ -202,9 +202,9 @@ class FunctionPanel(QWidget):
             }
         """)
         self.function_list_layout = QVBoxLayout(self.function_list_widget)
-        self.function_list_layout.setSpacing(10)  # 卡片间距
+        self.function_list_layout.setSpacing(Spacing.SM)  # 卡片间距
         self.function_list_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.function_list_layout.setContentsMargins(5, 5, 5, 5)
+        self.function_list_layout.setContentsMargins(Spacing.XS, Spacing.XS, Spacing.XS, Spacing.XS)
 
         scroll_area.setWidget(self.function_list_widget)
         # 使用 stretch=1 让滚动区域占据所有可用的垂直空间
