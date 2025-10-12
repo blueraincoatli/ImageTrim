@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>imagetrim</id>
+  <launchable type="desktop-id">imagetrim.desktop</launchable>
+  <name>ImageTrim</name>
+  <name xml:lang="zh_CN">ImageTrim 图片精简工具</name>
+  <summary>Modern image deduplication and format conversion tool</summary>
+  <summary xml:lang="zh_CN">现代化的图片去重和格式转换工具</summary>
+  <description>
+    <p>
+      ImageTrim is a modern image processing tool that combines intelligent deduplication
+      with batch format conversion capabilities. Built with PyQt6, it offers a sleek,
+      user-friendly interface for managing your image collection.
+    </p>
+    <p xml:lang="zh_CN">
+      ImageTrim 是一个现代化的图片处理工具，结合了智能去重和批量格式转换功能。
+      基于 PyQt6 构建，为管理图片集合提供了时尚、用户友好的界面。
+    </p>
+    <p>
+      Key features include:
+    </p>
+    <ul>
+      <li>Smart deduplication using multiple hashing algorithms</li>
+      <li>Batch conversion between AVIF, WEBP, JPEG, PNG formats</li>
+      <li>Modern PyQt6-based interface with dark theme support</li>
+      <li>Multi-threaded processing for responsive performance</li>
+      <li>Drag-and-drop support for easy file management</li>
+    </ul>
+    <p xml:lang="zh_CN">
+      主要功能包括：
+    </p>
+    <ul>
+      <li xml:lang="zh_CN">使用多种哈希算法进行智能去重</li>
+      <li xml:lang="zh_CN">支持 AVIF、WEBP、JPEG、PNG 格式之间的批量转换</li>
+      <li xml:lang="zh_CN">基于 PyQt6 的现代化界面，支持深色主题</li>
+      <li xml:lang="zh_CN">多线程处理，确保响应性能</li>
+      <li xml:lang="zh_CN">拖拽支持，简化文件管理</li>
+    </ul>
+  </description>
+
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+
+  <url type="homepage">https://github.com/blueraincoatli/DeDupImg</url>
+  <url type="bugtracker">https://github.com/blueraincoatli/DeDupImg/issues</url>
+  <url type="help">https://github.com/blueraincoatli/DeDupImg/wiki</url>
+  <url type="vcs-browser">https://github.com/blueraincoatli/DeDupImg</url>
+
+  <provides>
+    <binary>imagetrim</binary>
+  </provides>
+
+  <releases>
+    <release version="1.0.0" date="2025-10-12" type="stable"/>
+  </releases>
+
+  <content_rating type="oars-1.1"/>
+
+  <developer id="blueraincoatli">
+    <name>BlueRainCoat</name>
+  </developer>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+
+  <recommends>
+    <memory>1024</memory> <!-- 1GB RAM -->
+    <display_length compare="ge">768</display_length> <!-- Minimum height -->
+  </recommends>
+
+  <requires>
+    <display_length compare="ge">600</display_length> <!-- Minimum height -->
+    <internet>always</internet> <!-- For online image downloads -->
+  </requires>
+</component>
