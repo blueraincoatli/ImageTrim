@@ -10,7 +10,14 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(gh pr create:*)",
+      "Bash(where:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(cat:*)",
+      "Bash(timeout:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

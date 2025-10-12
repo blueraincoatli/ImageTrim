@@ -8,11 +8,11 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStacked
                              QGridLayout, QSizePolicy, QProgressBar, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QImage
-from core.function_manager import FunctionManager
-from core.base_module import BaseFunctionModule
-from utils.image_utils import ImageUtils
-from ui.theme import Spacing
-from ui.welcome_screen import WelcomeScreen
+from app.core.function_manager import FunctionManager
+from app.core.base_module import BaseFunctionModule
+from app.utils.image_utils import ImageUtils
+from app.ui.theme import Spacing
+from app.ui.welcome_screen import WelcomeScreen
 
 
 class DuplicateGroupWidget(QFrame):
@@ -119,32 +119,32 @@ class DeduplicationWorkspace(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
         layout.setSpacing(Spacing.SM)
-        
-        # # 顶部操作栏
-        # top_bar = QHBoxLayout()
-        
-        # title = QLabel("🔍 重复图片结果")
-        # title.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
-        # top_bar.addWidget(title)
-        # top_bar.addStretch()
-        
-        # self.select_all_btn = QPushButton("全选")
-        # self.select_all_btn.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: #007bff;
-        #         color: white;
-        #         border: none;
-        #         padding: 8px 16px;
-        #         border-radius: 4px;
-        #         font-weight: bold;
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #0069d9;
-        #     }
-        # """)
+
+        # 顶部操作栏
+        top_bar = QHBoxLayout()
+
+        title = QLabel("🔍 重复图片结果")
+        title.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
+        top_bar.addWidget(title)
+        top_bar.addStretch()
+
+        self.select_all_btn = QPushButton("全选")
+        self.select_all_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #0069d9;
+            }
+        """)
         self.select_all_btn.clicked.connect(self.select_all)
         top_bar.addWidget(self.select_all_btn)
-        
+
         self.unselect_all_btn = QPushButton("取消全选")
         self.unselect_all_btn.setStyleSheet("""
             QPushButton {
@@ -161,7 +161,7 @@ class DeduplicationWorkspace(QWidget):
         """)
         self.unselect_all_btn.clicked.connect(self.unselect_all)
         top_bar.addWidget(self.unselect_all_btn)
-        
+
         self.delete_btn = QPushButton("🗑️ 删除选中")
         self.delete_btn.setStyleSheet("""
             QPushButton {
@@ -177,7 +177,7 @@ class DeduplicationWorkspace(QWidget):
             }
         """)
         top_bar.addWidget(self.delete_btn)
-        
+
         self.move_btn = QPushButton("📂 移动到...")
         self.move_btn.setStyleSheet("""
             QPushButton {
@@ -193,7 +193,7 @@ class DeduplicationWorkspace(QWidget):
             }
         """)
         top_bar.addWidget(self.move_btn)
-        
+
         # 日志按钮
         self.log_btn = QPushButton("📋 日志")
         self.log_btn.setCheckable(True)
@@ -215,7 +215,7 @@ class DeduplicationWorkspace(QWidget):
         """)
         self.log_btn.clicked.connect(self.toggle_log)
         top_bar.addWidget(self.log_btn)
-        
+
         layout.addLayout(top_bar)
         
         # 进度条

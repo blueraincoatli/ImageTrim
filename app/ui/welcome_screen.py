@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap, QImage
 from pathlib import Path
-from ui.theme import Theme
+from app.ui.theme import Theme
 
 
 class ImageLoader(QThread):
