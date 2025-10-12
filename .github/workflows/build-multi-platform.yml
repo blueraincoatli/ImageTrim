@@ -105,12 +105,12 @@ jobs:
     - name: Build application
       shell: bash
       run: |
-        echo "📁 Current directory contents:"
+        echo "Current directory contents:"
         ls -la
-        echo "📁 App directory contents:"
+        echo "App directory contents:"
         ls -la app/ || echo "App directory not found"
-        echo "🔧 Starting build with simplified script..."
-        python build_simple.py
+        echo "Starting build with simplified script..."
+        .venv/bin/python build_simple.py
 
     - name: Create additional packages (Linux)
       if: matrix.platform == 'linux'
