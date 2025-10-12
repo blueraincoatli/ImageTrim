@@ -123,6 +123,7 @@ class AVIFConverterWorkspace(QWidget):
         # 日志区域
         log_frame = QGroupBox("转换日志")
         log_frame.setStyleSheet("QGroupBox { background-color: #1B1B1B; color: white; border: 1px solid #353535; font-weight: bold; }")
+        log_frame.setMaximumHeight(160)  # 限制整个日志框架的最大高度
         log_layout = QVBoxLayout(log_frame)
         log_layout.setContentsMargins(10, 20, 10, 10)
         
@@ -131,9 +132,10 @@ class AVIFConverterWorkspace(QWidget):
             QTextEdit {
                 background-color: #1B1B1B;
                 color: white;
-                border: 1px solid #6c757d;
+                border: none;
                 border-radius: 4px;
-                min-height: 150px;
+                min-height: 80px;
+                max-height: 120px;
             }
         """)
         self.log_text.setReadOnly(True)

@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(python -m app.main)",
-      "Bash(git add -A)"
+      "Bash(copy \"E:\\FFOutput\\Dedup\\app\\resources\\icons\\imagetrim.ico\" \"E:\\FFOutput\\Dedup\\app\\resources\\images\\placeholder.png\")",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(python:*)",
+      "Bash(del:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
