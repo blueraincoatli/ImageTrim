@@ -4,7 +4,7 @@ AVIF转换模块
 """
 
 import threading
-from core.base_module import BaseFunctionModule
+from app.core.base_module import BaseFunctionModule
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QTextEdit, QFileDialog, QLineEdit, QCheckBox, QSpinBox, QGroupBox, QComboBox
 from PyQt6.QtCore import Qt
 from .ui import AVIFConverterWorkspace

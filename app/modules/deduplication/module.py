@@ -4,12 +4,12 @@
 """
 
 import threading
-from core.base_module import BaseFunctionModule
+from app.core.base_module import BaseFunctionModule
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
                              QProgressBar, QFileDialog, QLineEdit, QCheckBox, QSpinBox, 
                              QGroupBox, QListWidget, QStackedWidget)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
-from utils.image_utils import ImageUtils
+from app.utils.image_utils import ImageUtils
 import os
 
 
@@ -326,8 +326,8 @@ class DeduplicationModule(BaseFunctionModule):
             QWidget: 工作区UI面板
         """
         # 延迟导入结果面板和拖拽区域，避免循环导入
-        from modules.deduplication.results_panel import DeduplicationResultsPanel
-        from modules.deduplication.drag_drop_area import DragDropArea
+        from app.modules.deduplication.results_panel import DeduplicationResultsPanel
+        from app.modules.deduplication.drag_drop_area import DragDropArea
         
         if self.workspace_ui is None:
             # 创建一个堆叠部件，用于在拖拽区域和结果面板之间切换

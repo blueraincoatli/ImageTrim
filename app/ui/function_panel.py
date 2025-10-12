@@ -7,8 +7,8 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea,
                              QFrame, QPushButton, QGraphicsDropShadowEffect, QSizePolicy)
 from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QSize, pyqtProperty
 from PyQt6.QtGui import QColor
-from core.function_manager import FunctionManager
-from ui.theme import Theme, Spacing, Shadow, BorderRadius
+from app.core.function_manager import FunctionManager
+from app.ui.theme import Theme, Spacing, Shadow, BorderRadius
 
 
 class FunctionCard(QPushButton):

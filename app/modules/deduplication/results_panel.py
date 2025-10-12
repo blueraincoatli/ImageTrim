@@ -14,9 +14,9 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushBut
 from PyQt6.QtWidgets import QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QCoreApplication, QEvent, QPoint, QRect
 from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen, QScreen, QCursor
-from utils.image_utils import ImageUtils
-from utils.ui_helpers import UIHelpers
-from ui.theme import Spacing
+from app.utils.image_utils import ImageUtils
+from app.utils.ui_helpers import UIHelpers
+from app.ui.theme import Spacing
 
 
 class ClickablePathLabel(QLabel):

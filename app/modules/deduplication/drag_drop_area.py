@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushBut
                              QTableWidget, QTableWidgetItem, QHeaderView)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
-from ui.theme import Spacing
+from app.ui.theme import Spacing
 
 
 class DragDropArea(QFrame):

@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from pathlib import Path
-from ui.theme import Theme, FontSize, Spacing
+from app.ui.theme import Theme, FontSize, Spacing
 
 
 class AboutWidget(QWidget):

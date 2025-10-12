@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QProgressBar, QTextEdit, QGroupBox, QApplication)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
-from utils.image_utils import ImageUtils
+from app.utils.image_utils import ImageUtils
 
 
 class AVIFConverterWorkspace(QWidget):

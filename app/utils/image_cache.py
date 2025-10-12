@@ -6,7 +6,7 @@
 from typing import Optional, Tuple
 from collections import OrderedDict
 from PIL import Image
-from utils.image_utils import ImageUtils
+from app.utils.image_utils import ImageUtils
 
 
 class ImageCache:

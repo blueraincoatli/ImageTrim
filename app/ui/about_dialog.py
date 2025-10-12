@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QIcon
 from pathlib import Path
-from ui.theme import Theme, FontSize, Spacing
+from app.ui.theme import Theme, FontSize, Spacing
 
 
 class AboutDialog(QDialog):

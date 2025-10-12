@@ -8,14 +8,14 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
 from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtGui import QIcon, QCursor
 from pathlib import Path
-from core.function_manager import FunctionManager
-from ui.function_panel import FunctionPanel
-from ui.settings_panel import SettingsPanel
-from ui.workspace_panel import WorkspacePanel
-from ui.about_dialog import AboutDialog
-from ui.theme import Theme, FontSize, Spacing
-from modules.deduplication import DeduplicationModule
-from modules.avif_converter import AVIFConverterModule
+from app.core.function_manager import FunctionManager
+from app.ui.function_panel import FunctionPanel
+from app.ui.settings_panel import SettingsPanel
+from app.ui.workspace_panel import WorkspacePanel
+from app.ui.about_dialog import AboutDialog
+from app.ui.theme import Theme, FontSize, Spacing
+from app.modules.deduplication import DeduplicationModule
+from app.modules.avif_converter import AVIFConverterModule
 
 
 class MainWindow(QMainWindow):

@@ -7,10 +7,10 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QStackedWidget,
                              QFrame, QGraphicsDropShadowEffect)
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
-from core.function_manager import FunctionManager
-from core.base_module import BaseFunctionModule
-from ui.theme import Theme, Spacing, Shadow, BorderRadius
-from ui.about_widget import AboutWidget
+from app.core.function_manager import FunctionManager
+from app.core.base_module import BaseFunctionModule
+from app.ui.theme import Theme, Spacing, Shadow, BorderRadius
+from app.ui.about_widget import AboutWidget
 
 
 class SettingsPanel(QWidget):

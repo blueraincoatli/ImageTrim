@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QFontDatabase
-from ui.main_window import MainWindow
-from ui.theme import Theme, FontSize
+from app.ui.main_window import MainWindow
+from app.ui.theme import Theme, FontSize
 
 
 def setup_font(app):
