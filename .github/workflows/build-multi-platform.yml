@@ -231,7 +231,7 @@ EOF
       run: |
         TAG_NAME="${GITHUB_REF#refs/tags/}"
         if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-          echo "🗑️ 删除现有 Release: $TAG_NAME"
+          echo "Deleting existing release: $TAG_NAME"
           gh release delete "$TAG_NAME" --yes
         fi
       env:
@@ -254,28 +254,28 @@ EOF
         generate_release_notes: true
         name: "ImageTrim ${{ github.ref_name }}"
         body: |
-          ## 🎉 ImageTrim ${{ github.ref_name }} 发布
+          ## ImageTrim ${{ github.ref_name }} Release
 
-          ### ✨ 主要功能
-          - 图片去重功能
-          - AVIF格式转换
-          - 现代化UI界面
+          ### Main Features
+          - Image deduplication functionality
+          - AVIF format conversion
+          - Modern UI interface
 
-          ### 🐦🐧 新增支持平台
-          - macOS 应用程序包 (.app)
-          - Linux 可执行文件和 AppImage
+          ### Cross-Platform Support
+          - macOS application bundle (.app)
+          - Linux executable and AppImage
 
-          ### 📦 下载文件
+          ### Download Files
           - **Windows**: `ImageTrim.exe`
-          - **macOS**: `ImageTrim.app` 或 `.dmg` 安装包
-          - **Linux**: `imagetrim` 可执行文件或 `.AppImage`
+          - **macOS**: `ImageTrim.app` or `.dmg` installer package
+          - **Linux**: `imagetrim` executable or `.AppImage`
 
-          ### 🚀 使用方法
-          1. 下载对应平台的文件
-          2. Windows/macOS: 双击运行
+          ### Usage Instructions
+          1. Download the file for your platform
+          2. Windows/macOS: Double-click to run
           3. Linux: `chmod +x imagetrim && ./imagetrim`
 
           ---
-          🤖 自动构建于 GitHub Actions
+          Automatically built with GitHub Actions
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
