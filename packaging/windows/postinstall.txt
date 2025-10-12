@@ -1,0 +1,28 @@
+ImageTrim 安装完成！
+
+恭喜！ImageTrim 已成功安装到您的计算机上。
+
+开始使用：
+• 点击桌面上的 "ImageTrim" 图标启动程序
+• 或从开始菜单中选择 "ImageTrim"
+• 程序启动后，您可以通过拖拽文件或使用界面按钮来处理图片
+
+快捷方式：
+• 程序已添加到开始菜单和桌面（如果您选择了桌面图标）
+• 支持右键菜单：在图片文件上右键选择 "用 ImageTrim 打开"
+
+技术支持：
+• GitHub：https://github.com/blueraincoatli/DeDupImg
+• 问题反馈：https://github.com/blueraincoatli/DeDupImg/issues
+
+许可证：
+ImageTrim 采用 MIT 许可证，您可以自由使用和分发。
+
+卸载方法：
+如果您不再需要 ImageTrim，可以通过以下方式卸载：
+1. 打开 Windows 控制面板
+2. 选择 "程序和功能"
+3. 找到 "ImageTrim" 并点击卸载
+或使用开始菜单中的卸载快捷方式
+
+感谢您的使用！祝您使用愉快！

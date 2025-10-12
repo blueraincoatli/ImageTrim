@@ -1,6 +1,6 @@
 @echo off
 echo Starting ImageTrim - 图片精简工具...
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 echo 检查启动环境...
 

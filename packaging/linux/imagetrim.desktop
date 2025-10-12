@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=ImageTrim
+Name[zh_CN]=ImageTrim 图片精简工具
+Comment=Modern image deduplication and format conversion tool
+Comment[zh_CN]=现代化的图片去重和格式转换工具
+Exec=imagetrim
+Icon=imagetrim
+Terminal=false
+Type=Application
+Categories=Graphics;Photography;Qt;
+Keywords=image;deduplication;conversion;avif;webp;
+StartupNotify=true
+Version=1.0.0
+X-Desktop-File-Install-Version=0.24
