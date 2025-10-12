@@ -180,12 +180,12 @@ jobs:
             echo "Final attempt: creating AppImage manually..."
             # Create a simple AppImage without desktop integration
             mkdir -p ImageTrim.AppDir/usr/bin
-            cat > ImageTrim.AppDir/AppRun << 'APPRUNEOF'
+            cat > ImageTrim.AppDir/AppRun << 'EOF'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "${0}")")"
 export PATH="${HERE}/usr/bin:${PATH}"
 exec "${HERE}/usr/bin/imagetrim" "$@"
-APPRUNEOF
+EOF
             chmod +x ImageTrim.AppDir/AppRun
             ./appimagetool --no-appstream ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage
           }
