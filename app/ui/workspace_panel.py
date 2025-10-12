@@ -3,14 +3,16 @@
 工作区面板
 """
 
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget, 
-                             QFrame, QPushButton, QTextEdit, QSplitter, QScrollArea, 
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget,
+                             QFrame, QPushButton, QTextEdit, QSplitter, QScrollArea,
                              QGridLayout, QSizePolicy, QProgressBar, QCheckBox)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QImage
 from core.function_manager import FunctionManager
 from core.base_module import BaseFunctionModule
 from utils.image_utils import ImageUtils
+from ui.theme import Spacing
+from ui.welcome_screen import WelcomeScreen
 
 
 class DuplicateGroupWidget(QFrame):
@@ -48,7 +50,7 @@ class DuplicateGroupWidget(QFrame):
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)  # 清除内部边距
-        layout.setSpacing(30)  # 设置内部元素间距
+        layout.setSpacing(Spacing.XL)  # 使用主题间距规范
         
         # 显示第一张图片
         if len(self.files) >= 1:
@@ -115,8 +117,8 @@ class DeduplicationWorkspace(QWidget):
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
+        layout.setSpacing(Spacing.SM)
         
         # # 顶部操作栏
         # top_bar = QHBoxLayout()
@@ -272,7 +274,7 @@ class DeduplicationWorkspace(QWidget):
         self.scroll_widget = QWidget()
         self.scroll_widget.setStyleSheet("background-color: #1e1e1e;")
         self.grid_layout = QGridLayout(self.scroll_widget)
-        self.grid_layout.setSpacing(10)
+        self.grid_layout.setSpacing(Spacing.SM)
         
         self.scroll_area.setWidget(self.scroll_widget)
         self.splitter.addWidget(self.scroll_area)
@@ -289,7 +291,7 @@ class DeduplicationWorkspace(QWidget):
         self.log_area.setVisible(False)
         
         log_layout = QVBoxLayout(self.log_area)
-        log_layout.setContentsMargins(10, 10, 10, 10)
+        log_layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
         
         log_title = QLabel("📋 处理日志")
         log_title.setStyleSheet("font-weight: bold; color: white;")
@@ -415,6 +417,8 @@ class WorkspacePanel(QWidget):
     """
     工作区面板
     """
+    # 新增：欢迎屏幕图片加载完成信号
+    welcome_image_loaded = pyqtSignal()
 
     def __init__(self, function_manager: FunctionManager):
         super().__init__()
@@ -427,11 +431,26 @@ class WorkspacePanel(QWidget):
         """初始化UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         # 工作区
         self.stacked_widget = QStackedWidget()
         layout.addWidget(self.stacked_widget)
+
+        # 添加欢迎屏幕作为默认显示
+        welcome_widget = WelcomeScreen()
+        self.welcome_screen = welcome_widget  # 保存引用以便连接信号
+
+        # 连接欢迎屏幕的图片加载完成信号
+        self.welcome_screen.image_loading_completed.connect(self.on_welcome_image_loaded)
+
+        self.stacked_widget.addWidget(welcome_widget)
         
+    def on_welcome_image_loaded(self):
+        """欢迎屏幕图片加载完成"""
+        print("WorkspacePanel收到欢迎屏幕图片加载完成信号")
+        # 转发信号
+        self.welcome_image_loaded.emit()
+
     def update_ui(self, module: BaseFunctionModule):
         """更新UI以显示指定模块的工作区"""
         # 检查是否已经为该模块创建工作区UI

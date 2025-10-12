@@ -100,7 +100,7 @@ class AboutWidget(QWidget):
         layout.addWidget(author)
 
         # 版权信息
-        copyright_info = QLabel("© 2024 ImageTrim")
+        copyright_info = QLabel("© 2025 ImageTrim")
         copyright_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         copyright_info.setStyleSheet(f"""
             font-size: {int(FontSize.SMALL * 0.8)}pt;

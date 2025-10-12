@@ -13,6 +13,8 @@ class Theme:
     PRIMARY = "#FF8C00"           # 橙色（主色）
     PRIMARY_LIGHT = "#FFA500"     # 浅橙色
     PRIMARY_DARK = "#FF6B35"      # 深橙色
+    PRIMARY_HOVER = "#FFB347"      # 悬停橙色
+    PRIMARY_ACTIVE = "#FF8C00"     # 激活橙色
 
     # ===== 背景色 =====
     BG_DARK = "#1E1E1E"          # 深色背景

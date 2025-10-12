@@ -365,7 +365,10 @@ class DeduplicationModule(BaseFunctionModule):
         if path and path not in self.scan_paths:
             self.scan_paths.append(path)
             self.path_list.addItem(path)
-            
+
+            # 启用扫描按钮
+            self.scan_stop_btn.setEnabled(True)
+
             # 同步到拖拽区域
             if hasattr(self, "drag_drop_area"):
                 self.drag_drop_area.set_paths(self.scan_paths)
@@ -377,19 +380,26 @@ class DeduplicationModule(BaseFunctionModule):
             self.path_list.takeItem(row)
             if row < len(self.scan_paths):
                 del self.scan_paths[row]
-                
+
         # 同步到拖拽区域
         if hasattr(self, "drag_drop_area"):
             self.drag_drop_area.set_paths(self.scan_paths)
+
+        # 如果没有路径了，禁用扫描按钮
+        if not self.scan_paths:
+            self.scan_stop_btn.setEnabled(False)
 
     def clear_paths(self):
         """清空所有路径"""
         self.path_list.clear()
         self.scan_paths.clear()
-        
+
         # 同步到拖拽区域
         if hasattr(self, "drag_drop_area"):
             self.drag_drop_area.set_paths(self.scan_paths)
+
+        # 禁用扫描按钮
+        self.scan_stop_btn.setEnabled(False)
 
     def toggle_scan(self):
         """切换扫描状态"""

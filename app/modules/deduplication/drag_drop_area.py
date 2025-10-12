@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushBut
                              QTableWidget, QTableWidgetItem, QHeaderView)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
+from ui.theme import Spacing
 
 
 class DragDropArea(QFrame):
@@ -47,8 +48,8 @@ class DragDropArea(QFrame):
         
         # 创建布局
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        layout.setSpacing(Spacing.MD)
         
         # 标题图标
         icon_label = QLabel("📁")
@@ -90,7 +91,7 @@ class DragDropArea(QFrame):
         """)
         self.stats_group.setVisible(False)
         stats_layout = QVBoxLayout(self.stats_group)
-        stats_layout.setSpacing(10)
+        stats_layout.setSpacing(Spacing.SM)
         
         # 总览统计信息（简化为一行）
         self.overall_info = QLabel("📊 目录: 0 | 图片: 0 | 大小: 0 B")
@@ -130,7 +131,7 @@ class DragDropArea(QFrame):
         self.stats_container = QWidget()
         self.stats_container.setStyleSheet("background-color: transparent;")
         self.stats_layout = QVBoxLayout(self.stats_container)
-        self.stats_layout.setSpacing(5)
+        self.stats_layout.setSpacing(Spacing.XS)
         self.stats_layout.setContentsMargins(0, 0, 0, 0)
         
         self.stats_scroll.setWidget(self.stats_container)
@@ -302,7 +303,7 @@ class DragDropArea(QFrame):
         """)
         
         layout = QHBoxLayout(card)
-        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
         
         # 目录名
         dir_name = os.path.basename(path)
@@ -337,11 +338,22 @@ class DragDropArea(QFrame):
         """格式化文件大小"""
         if size_bytes == 0:
             return "0 B"
-        
+
         size_names = ["B", "KB", "MB", "GB", "TB"]
         i = 0
         while size_bytes >= 1024 and i < len(size_names) - 1:
             size_bytes /= 1024.0
             i += 1
-        
+
         return f"{size_bytes:.2f} {size_names[i]}"
+
+    def set_paths(self, paths):
+        """
+        设置路径列表并分析统计信息
+
+        Args:
+            paths: 路径列表
+        """
+        # 始终调用analyze_paths，即使paths为空
+        # 这样可以在清空路径时也清除统计信息
+        self.analyze_paths(paths)

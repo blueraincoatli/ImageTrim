@@ -15,6 +15,7 @@ from ui.theme import Theme
 class ImageLoader(QThread):
     """异步图片加载线程"""
     image_loaded = pyqtSignal(QPixmap)
+    loading_completed = pyqtSignal()  # 新增：加载完成信号
 
     def __init__(self):
         super().__init__()
@@ -71,6 +72,7 @@ class ImageLoader(QThread):
                         print(f"成功转换图片，尺寸: {pixmap.width()}x{pixmap.height()}")
                         # 发送成功信号
                         self.image_loaded.emit(pixmap)
+                        self.loading_completed.emit()  # 发送加载完成信号
                         return
                     else:
                         print("图片转换失败，pixmap为空")
@@ -81,10 +83,12 @@ class ImageLoader(QThread):
             # 所有网络图片都加载失败，发送空pixmap触发本地兜底
             print("所有网络图片加载失败，使用本地兜底图片")
             self.image_loaded.emit(QPixmap())
+            self.loading_completed.emit()  # 即使失败也发送完成信号
 
         except Exception as e:
             print(f"图片加载异常: {e}")
             self.image_loaded.emit(QPixmap())
+            self.loading_completed.emit()  # 即使异常也发送完成信号
 
 
 class WelcomeScreen(QWidget):
@@ -92,6 +96,8 @@ class WelcomeScreen(QWidget):
     欢迎屏幕 - 在右侧工作区显示撑满的图片
     优先网络高清图片，失败时回退到本地图片
     """
+    # 新增：图片加载完成信号，用于通知主窗口
+    image_loading_completed = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -122,6 +128,7 @@ class WelcomeScreen(QWidget):
         """异步加载图片"""
         self.image_loader = ImageLoader()
         self.image_loader.image_loaded.connect(self.on_image_loaded)
+        self.image_loader.loading_completed.connect(self.on_loading_completed)
         self.image_loader.start()
 
     def on_image_loaded(self, pixmap):
@@ -137,6 +144,12 @@ class WelcomeScreen(QWidget):
         else:
             # 网络图片加载失败，使用本地兜底图片
             self.load_local_image()
+
+    def on_loading_completed(self):
+        """图片加载完成（无论成功或失败）"""
+        print("图片加载流程完成，通知主窗口可以显示")
+        # 发送信号通知主窗口图片加载完成
+        self.image_loading_completed.emit()
 
     def load_local_image(self):
         """加载本地兜底图片"""

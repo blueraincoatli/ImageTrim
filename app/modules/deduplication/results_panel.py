@@ -7,7 +7,7 @@ import os
 import shutil
 from typing import Dict, List, Optional, Set, Tuple
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-                             QTextEdit, QScrollArea, QGridLayout,
+                             QTextEdit, QScrollArea, QGridLayout, QProgressBar,
                              QFrame, QCheckBox, QSplitter, QFileDialog, QMessageBox,
                              QApplication, QDialog, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
                              QSlider, QRubberBand)
@@ -16,7 +16,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QCoreApplication, QEvent, QPoin
 from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen, QScreen, QCursor
 from utils.image_utils import ImageUtils
 from utils.ui_helpers import UIHelpers
-from ui.animated_progress_bar import AnimatedProgressBar
+from ui.theme import Spacing
 
 
 class ClickablePathLabel(QLabel):
@@ -147,8 +147,8 @@ class ImagePathTooltip(QFrame):
         self.setMouseTracking(True)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(4)
+        layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
+        layout.setSpacing(Spacing.XS)
         
         self.path_labels = []
         
@@ -774,8 +774,8 @@ class DeduplicationResultsPanel(QWidget):
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
+        layout.setSpacing(Spacing.SM)
         
         # 创建分割器用于结果区域和日志区域
         self.splitter = QSplitter(Qt.Orientation.Vertical)
@@ -912,17 +912,27 @@ class DeduplicationResultsPanel(QWidget):
         """)
         top_layout.addWidget(self.grid_size_value_label)
 
-        # 进度条（使用带动画的进度条）
-        self.progress_bar = AnimatedProgressBar()
+        # 进度条（使用标准进度条）
+        self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("准备就绪")
-        
-        # 状态标签
-        self.status_label = QLabel("准备就绪")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("color: white;")
-        
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #454545;
+                border-radius: 4px;
+                text-align: center;
+                background-color: #333337;
+                color: white;
+                font-weight: bold;
+            }
+
+            QProgressBar::chunk {
+                background-color: #FF8C00;
+                border-radius: 3px;
+            }
+        """)
+
         # 重复项显示区域
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
@@ -952,8 +962,8 @@ class DeduplicationResultsPanel(QWidget):
         self.scroll_widget = QWidget()
         self.scroll_widget.setStyleSheet("background-color: #1e1e1e;")
         self.grid_layout = QGridLayout(self.scroll_widget)
-        self.grid_layout.setSpacing(10)  # 设置网格间距
-        self.grid_layout.setContentsMargins(10, 10, 10, 10)  # 设置网格边距
+        self.grid_layout.setSpacing(Spacing.SM)  # 设置网格间距
+        self.grid_layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)  # 设置网格边距
         
         self.scroll_area.setWidget(self.scroll_widget)
         
@@ -969,7 +979,7 @@ class DeduplicationResultsPanel(QWidget):
         self.log_area.setVisible(False)
         
         log_layout = QVBoxLayout(self.log_area)
-        log_layout.setContentsMargins(10, 10, 10, 10)
+        log_layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
         
         log_title = QLabel("📋 处理日志")
         log_title.setStyleSheet("font-weight: bold; color: white;")
@@ -991,10 +1001,9 @@ class DeduplicationResultsPanel(QWidget):
         top_container = QWidget()
         top_container_layout = QVBoxLayout(top_container)
         top_container_layout.setContentsMargins(0, 0, 0, 0)
-        top_container_layout.setSpacing(5)
+        top_container_layout.setSpacing(Spacing.XS)
         top_container_layout.addWidget(top_bar)
         top_container_layout.addWidget(self.progress_bar)
-        top_container_layout.addWidget(self.status_label)
         top_container_layout.addWidget(self.scroll_area)
         
         self.splitter.addWidget(top_container)
@@ -1145,9 +1154,9 @@ class DeduplicationResultsPanel(QWidget):
         self.update_grid_layout()
             
     def update_progress(self, value: float, message: str):
-        """更新进度（带平滑动画）"""
-        self.progress_bar.updateProgress(value, message)
-        self.status_label.setText(message)
+        """更新进度（无动画，直接更新）"""
+        self.progress_bar.setValue(int(value))
+        self.progress_bar.setFormat(f"{message} ({int(value)}%)")
         
     def add_log_message(self, message: str, level: str):
         """添加日志消息"""
@@ -1216,8 +1225,6 @@ class DeduplicationResultsPanel(QWidget):
             rows = (len(group_items) + columns - 1) // columns
             for i in range(rows):
                 self.grid_layout.setRowStretch(i, 1)
-                
-            self.status_label.setText(f"找到 {len(group_items)} 组重复图片 | 布局: {columns}列 | 列宽: {column_width}px | 缩略图: {self.thumbnail_size}px")
 
             # 强制刷新布局和缩略图显示（修复自动刷新问题）
             from PyQt6.QtCore import QTimer
@@ -1231,7 +1238,6 @@ class DeduplicationResultsPanel(QWidget):
             no_result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             no_result_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold; padding: 50px;")
             self.grid_layout.addWidget(no_result_label)
-            self.status_label.setText("未找到重复图片")
             
     def on_group_selection_changed(self, files, is_selected):
         payload = files[1:] if len(files) > 1 else []
@@ -1537,28 +1543,9 @@ class DeduplicationResultsPanel(QWidget):
                 # 在最后一行添加一个伸展因子，确保可以滚动
                 self.grid_layout.setRowStretch(rows, 1)
 
-            # 更新状态信息，显示当前布局信息
-            if hasattr(self, 'status_label'):
-                current_status = self.status_label.text()
-                if "找到" in current_status:
-                    # 保留"找到 X 组重复图片"的信息，更新布局信息
-                    base_status = current_status.split('|')[0].strip()
-                    if self.dpi_scale_factor != 1.0:
-                        self.status_label.setText(f"{base_status} | 布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px | DPI缩放: {self.dpi_scale_factor:.2f}x")
-                    else:
-                        self.status_label.setText(f"{base_status} | 布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px")
-                else:
-                    # 如果没有找到重复图片的信息，只显示布局信息
-                    if self.dpi_scale_factor != 1.0:
-                        self.status_label.setText(f"布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px | DPI缩放: {self.dpi_scale_factor:.2f}x")
-                    else:
-                        self.status_label.setText(f"布局: {columns}列(重复组) | 可用宽度: {logical_available_width}px | 列宽: {logical_column_width}px")
-
         except Exception as e:
             # 捕获并记录布局更新时的错误
             print(f"更新网格布局时出错: {str(e)}")
-            if hasattr(self, 'status_label'):
-                self.status_label.setText("布局更新出错，请尝试调整窗口大小或更改列数")
 
     def toggle_log(self):
         """切换日志区域的显示/隐藏"""

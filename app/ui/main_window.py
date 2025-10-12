@@ -33,6 +33,8 @@ class MainWindow(QMainWindow):
         # 用于窗口拖动的变量
         self.drag_position = QPoint()
 
+        # 初始化时不显示窗口，等待图片加载完成
+        self.setVisible(False)
         self.init_ui()
         self.register_modules()
 
@@ -96,6 +98,10 @@ class MainWindow(QMainWindow):
         
         # 创建右栏（工作区面板）
         self.workspace_panel = WorkspacePanel(self.function_manager)
+
+        # 连接欢迎屏幕图片加载完成信号
+        self.workspace_panel.welcome_image_loaded.connect(self.on_welcome_image_loaded)
+
         splitter.addWidget(self.workspace_panel)
 
         # 设置分割器比例
@@ -182,64 +188,92 @@ class MainWindow(QMainWindow):
         # 弹性空间
         title_layout.addStretch()
 
-        # 窗口控制按钮
+        # 窗口控制按钮容器
+        control_container = QWidget()
+        control_container.setFixedSize(120, 32)
+        control_layout = QHBoxLayout(control_container)
+        control_layout.setContentsMargins(0, 0, 0, 0)
+        control_layout.setSpacing(0)
+
         # 最小化按钮
-        min_btn = QPushButton("−")
-        min_btn.setFixedSize(32, 26)
-        min_btn.setStyleSheet(f"""
+        self.min_btn = QPushButton("")
+        self.min_btn.setFixedSize(40, 32)
+        self.min_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {Theme.BG_LIGHT};
-                color: white;
+                background-color: transparent;
+                color: {Theme.TEXT_PRIMARY};
                 border: none;
-                font-size: 18px;
-                font-weight: bold;
+                border-radius: 0;
+                font-size: 16px;
+                font-weight: normal;
             }}
             QPushButton:hover {{
-                background-color: {Theme.PRIMARY};
-                color: white;
+                background-color: rgba(255, 255, 255, 0.1);
+                color: {Theme.TEXT_PRIMARY};
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(255, 255, 255, 0.15);
+                color: {Theme.TEXT_PRIMARY};
             }}
         """)
-        min_btn.clicked.connect(self.showMinimized)
-        title_layout.addWidget(min_btn)
+        self.min_btn.setToolTip("最小化")
+        self.min_btn.clicked.connect(self.showMinimized)
+        control_layout.addWidget(self.min_btn)
 
         # 最大化/还原按钮
-        self.max_btn = QPushButton("◱")  # 使用Unicode正方形字符
-        self.max_btn.setFixedSize(32, 26)
+        self.max_btn = QPushButton("")
+        self.max_btn.setFixedSize(40, 32)
         self.max_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {Theme.BG_LIGHT};
-                color: white;
+                background-color: transparent;
+                color: {Theme.TEXT_PRIMARY};
                 border: none;
-                font-size: 18px;
-                font-weight: bold;
-                font-family: Arial, sans-serif;
+                border-radius: 0;
+                font-size: 16px;
+                font-weight: normal;
             }}
             QPushButton:hover {{
-                background-color: {Theme.PRIMARY};
-                color: white;
+                background-color: rgba(255, 255, 255, 0.1);
+                color: {Theme.TEXT_PRIMARY};
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(255, 255, 255, 0.15);
+                color: {Theme.TEXT_PRIMARY};
             }}
         """)
+        self.max_btn.setToolTip("最大化")
         self.max_btn.clicked.connect(self.toggle_maximize)
-        title_layout.addWidget(self.max_btn)
+        control_layout.addWidget(self.max_btn)
 
         # 关闭按钮
-        close_btn = QPushButton("×")
-        close_btn.setFixedSize(32, 26)
-        close_btn.setStyleSheet(f"""
+        self.close_btn = QPushButton("")
+        self.close_btn.setFixedSize(40, 32)
+        self.close_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {Theme.BG_LIGHT};
-                color: white;
+                background-color: transparent;
+                color: {Theme.TEXT_PRIMARY};
                 border: none;
-                font-size: 20px;
-                font-weight: bold;
+                border-radius: 0;
+                font-size: 16px;
+                font-weight: normal;
             }}
             QPushButton:hover {{
                 background-color: {Theme.ERROR};
                 color: white;
             }}
+            QPushButton:pressed {{
+                background-color: #E81123;
+                color: white;
+            }}
         """)
-        close_btn.clicked.connect(self.close)
-        title_layout.addWidget(close_btn)
+        self.close_btn.setToolTip("关闭")
+        self.close_btn.clicked.connect(self.close)
+        control_layout.addWidget(self.close_btn)
+
+        # 设置按钮图标
+        self.update_window_control_icons()
+
+        title_layout.addWidget(control_container)
 
     def create_status_bar(self):
         """创建状态栏"""
@@ -262,7 +296,7 @@ class MainWindow(QMainWindow):
         status_bar.addWidget(self.status_message)
 
         # 右侧关于信息（可点击）
-        about_label = QLabel("小红书: 919722379 | © 2024 ImageTrim")
+        about_label = QLabel("小红书: 919722379 | © 2025 ImageTrim")
         about_label.setStyleSheet(f"""
             color: {Theme.TEXT_DISABLED};
             font-size: {FontSize.SMALL}pt;
@@ -278,14 +312,43 @@ class MainWindow(QMainWindow):
         dialog = AboutDialog(self)
         dialog.exec()
 
+    def on_welcome_image_loaded(self):
+        """欢迎屏幕图片加载完成，显示窗口"""
+        print("主窗口收到欢迎屏幕图片加载完成信号，准备显示窗口")
+
+        # 显示窗口
+        self.show()
+
+        # 确保窗口在屏幕中央
+        screen = self.screen().availableGeometry()
+        x = (screen.width() - self.width()) // 2
+        y = (screen.height() - self.height()) // 2
+        self.move(x, y)
+
+        print("窗口已显示并居中")
+
+    def update_window_control_icons(self):
+        """更新窗口控制按钮图标"""
+        # 使用SVG图标样式的Unicode字符
+        self.min_btn.setText("−")
+        if self.isMaximized():
+            self.max_btn.setText("❐")
+            self.max_btn.setToolTip("还原")
+        else:
+            self.max_btn.setText("□")
+            self.max_btn.setToolTip("最大化")
+        self.close_btn.setText("×")
+
     def toggle_maximize(self):
         """切换最大化/还原"""
         if self.isMaximized():
             self.showNormal()
             self.max_btn.setText("□")
+            self.max_btn.setToolTip("最大化")
         else:
             self.showMaximized()
             self.max_btn.setText("❐")
+            self.max_btn.setToolTip("还原")
 
     def mousePressEvent(self, event):
         """鼠标按下事件 - 用于拖动窗口"""

@@ -193,7 +193,8 @@ def main():
     setup_theme(app, font_family)
 
     window = MainWindow()
-    window.show()
+    # 注意：窗口不会立即显示，会等待欢迎屏幕图片加载完成
+    print("应用程序启动，等待欢迎屏幕图片加载完成...")
     sys.exit(app.exec())
 
 
