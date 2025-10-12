@@ -71,11 +71,26 @@ jobs:
         sudo apt-get install -y libgtk-3-0 || echo "gtk3 not available"
         sudo apt-get install -y libasound2-dev || echo "alsa not available"
 
+        # 安装UPX用于压缩
+        sudo apt-get install -y upx-ucl || echo "UPX not available"
+
     - name: Install system dependencies (macOS)
       if: matrix.platform == 'macos'
       run: |
         # macOS 系统依赖通常已包含在系统中
         echo "macOS dependencies check"
+        # 安装UPX用于压缩
+        brew install upx || echo "UPX not available via brew"
+
+    - name: Install system dependencies (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        # Windows 下载UPX用于压缩
+        echo "Installing UPX for Windows..."
+        curl -L -o upx.zip https://github.com/upx/upx/releases/download/v4.2.2/upx-4.2.2-win64.zip
+        Expand-Archive -Path upx.zip -DestinationPath .
+        Move-Item upx-4.2.2-win64/upx.exe upx.exe -Force
+        echo "UPX installed"
 
     - name: Create build directories
       run: |
@@ -109,11 +124,11 @@ jobs:
         ls -la
         echo "App directory contents:"
         ls -la app/ || echo "App directory not found"
-        echo "Starting build with simplified script..."
+        echo "Starting optimized build..."
         if [ "${{ matrix.platform }}" = "windows" ]; then
-          .venv/Scripts/python build_simple.py
+          .venv/Scripts/python build_optimized.py
         else
-          .venv/bin/python build_simple.py
+          .venv/bin/python build_optimized.py
         fi
 
     - name: Create additional packages (Linux)
