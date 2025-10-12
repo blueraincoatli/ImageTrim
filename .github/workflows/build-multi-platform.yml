@@ -182,6 +182,7 @@ jobs:
         fi
 
     - name: Create archives
+      shell: bash
       run: |
         mkdir -p archives
         cd dist
