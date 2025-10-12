@@ -17,7 +17,17 @@
       "Bash(git merge:*)",
       "Bash(cat:*)",
       "Bash(timeout:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(start:*)",
+      "Bash(cmd:*)",
+      "Bash(uv:*)",
+      "Bash(.venvScripts:*)",
+      "Bash(./.venv/Scripts/python.exe:*)",
+      "Bash(call:*)",
+      "Bash(source:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []
