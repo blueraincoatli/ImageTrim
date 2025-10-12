@@ -181,6 +181,31 @@ jobs:
           fi
         fi
 
+    - name: Create archives
+      shell: bash
+      run: |
+        mkdir -p archives
+        cd dist
+        for file in *; do
+          if [ -f "$file" ]; then
+            if [ "${{ matrix.platform }}" = "windows" ]; then
+              # Create ZIP for Windows using Python (always available)
+              python -c "
+import zipfile
+import os
+import sys
+with zipfile.ZipFile(f'../archives/${file}.zip', 'w', zipfile.ZIP_DEFLATED) as zipf:
+    zipf.write('${file}', os.path.basename('${file}'))
+print(f'Created archive: ${file}.zip')
+              "
+            else
+              # Create tar.gz for macOS and Linux
+              tar -czf "../archives/${file}.tar.gz" "$file"
+            fi
+          fi
+        done
+        cd ..
+
     - name: Create DMG (macOS)
       if: matrix.platform == 'macos'
       run: |
@@ -188,7 +213,7 @@ jobs:
           mkdir -p dmg_temp
           cp -R "dist/ImageTrim.app" dmg_temp/
           ln -s /Applications dmg_temp/Applications
-          hdiutil create -volname "ImageTrim" -srcfolder dmg_temp -ov -format UDZO ImageTrim-1.1.4-macos.dmg
+          hdiutil create -volname "ImageTrim" -srcfolder dmg_temp -ov -format UDZO ImageTrim-1.1.1-macos.dmg
           rm -rf dmg_temp
         fi
 
@@ -198,6 +223,7 @@ jobs:
         name: ${{ matrix.platform }}-build
         path: |
           dist/
+          archives/
           *.AppImage
           *.dmg
         retention-days: 30
@@ -222,6 +248,7 @@ jobs:
         echo "All builds completed successfully!"
         echo ""
         echo "Available artifacts:"
-        ls -la artifacts/ || echo "No artifacts found"
+        ls -la artifacts/ || echo "No archives found"
+        ls -la dist/ || echo "No dist files found"
         echo ""
         echo "Download the files from the Actions tab above."
