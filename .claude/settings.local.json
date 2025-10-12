@@ -34,7 +34,18 @@
       "Bash(curl:*)",
       "Bash(powershell:*)",
       "Bash(zip:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(pyinstaller:*)",
+      "Bash(./ImageTrim.exe)",
+      "Bash(.ImageTrim.exe)",
+      "Bash(dir:*)",
+      "Bash(unzip:*)",
+      "Bash(rd:*)",
+      "Bash(.venvScriptspython.exe:*)",
+      "Bash(..venvScriptspython.exe:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "WebSearch",
+      "Bash(ping:*)"
     ],
     "deny": [],
     "ask": []
