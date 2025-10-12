@@ -1,0 +1,231 @@
+name: Rebuild Existing Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to rebuild (e.g., v1.0.0)'
+        required: true
+        type: string
+      delete_existing:
+        description: 'Delete existing release before rebuilding'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  rebuild:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: imagetrim
+          - os: windows-latest
+            platform: windows
+            artifact_name: ImageTrim.exe
+          - os: macos-latest
+            platform: macos
+            artifact_name: ImageTrim.app
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整历史记录
+
+    - name: Checkout specific tag
+      run: |
+        git checkout ${{ github.event.inputs.version }}
+
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Create virtual environment
+      run: uv venv
+
+    - name: Install dependencies
+      run: |
+        uv pip install --upgrade pip
+        uv pip install -r requirements.txt
+        uv pip install pyinstaller
+
+    - name: Install system dependencies (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-tk python3-dev libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libxcb-xinerama0
+
+    - name: Create build directories
+      run: |
+        mkdir -p build/macos
+        mkdir -p build/linux
+
+    - name: Create macOS Info.plist
+      if: matrix.platform == 'macos'
+      run: |
+        cat > build/macos/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleName</key>
+            <string>ImageTrim</string>
+            <key>CFBundleDisplayName</key>
+            <string>ImageTrim</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.imagetrim.imagetrim</string>
+            <key>CFBundleVersion</key>
+            <string>1.0.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundleExecutable</key>
+            <string>ImageTrim</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.14</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>NSSupportsAutomaticGraphicsSwitching</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+
+    - name: Create Linux .desktop file
+      if: matrix.platform == 'linux'
+      run: |
+        cat > build/linux/imagetrim.desktop << 'EOF'
+        [Desktop Entry]
+        Name=ImageTrim
+        Name[zh_CN]=图片去重工具
+        Comment=Image deduplication and conversion tool
+        Comment[zh_CN]=图片去重和格式转换工具
+        Exec=imagetrim
+        Icon=imagetrim
+        Terminal=false
+        Type=Application
+        Categories=Graphics;Photography;
+        MimeType=image/jpeg;image/png;image/webp;image/avif;
+        StartupWMClass=ImageTrim
+        EOF
+
+    - name: Build application
+      run: |
+        python build_cross_platform.py
+
+    - name: Create additional packages (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        mkdir -p ImageTrim.AppDir/usr/bin
+        mkdir -p ImageTrim.AppDir/usr/share/applications
+        mkdir -p ImageTrim.AppDir/usr/share/icons/hicolor/256x256/apps
+
+        cp dist/imagetrim ImageTrim.AppDir/usr/bin/
+        cp build/linux/imagetrim.desktop ImageTrim.AppDir/usr/share/applications/
+
+        cat > ImageTrim.AppDir/AppRun << 'EOFRUN'
+        #!/bin/sh
+        HERE="$(dirname "$(readlink -f "${0}")")"
+        export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}"
+        export PATH="${HERE}/usr/bin:${PATH}"
+        exec "${HERE}/usr/bin/imagetrim" "$@"
+        EOFRUN
+        chmod +x ImageTrim.AppDir/AppRun
+
+        wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+        chmod +x appimagetool
+        ./appimagetool ImageTrim.AppDir ImageTrim-${{ github.event.inputs.version }}-linux.AppImage
+
+    - name: Create DMG (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        if [ -f "dist/ImageTrim.app" ]; then
+          mkdir -p dmg_temp
+          cp -R "dist/ImageTrim.app" dmg_temp/
+          ln -s /Applications dmg_temp/Applications
+          hdiutil create -volname "ImageTrim" -srcfolder dmg_temp -ov -format UDZO ImageTrim-${{ github.event.inputs.version }}-macos.dmg
+          rm -rf dmg_temp
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.platform }}-rebuild-${{ github.event.inputs.version }}
+        path: |
+          dist/
+          archives/
+          *.AppImage
+          *.dmg
+        retention-days: 30
+
+  update-release:
+    needs: rebuild
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        pattern: "*rebuild-${{ github.event.inputs.version }}"
+
+    - name: Delete existing Release
+      if: github.event.inputs.delete_existing == 'true'
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        if gh release view "$VERSION" >/dev/null 2>&1; then
+          echo "🗑️ 删除现有 Release: $VERSION"
+          gh release delete "$VERSION" --yes
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create/Update Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        name: "ImageTrim ${{ github.event.inputs.version }}"
+        files: |
+          artifacts/*rebuild-*/dist/*.exe
+          artifacts/*rebuild-*/dist/*.app/**
+          artifacts/*rebuild-*/dist/imagetrim
+          artifacts/*rebuild-*/archives/*.tar.gz
+          artifacts/*rebuild-*/archives/*.zip
+          artifacts/*rebuild-*/*.AppImage
+          artifacts/*rebuild-*/*.dmg
+        draft: false
+        prerelease: false
+        generate_release_notes: false
+        body: |
+          ## 🎉 ImageTrim ${{ github.event.inputs.version }} 发布
+
+          ### ✨ 主要功能
+          - 图片去重功能
+          - AVIF格式转换
+          - 现代化UI界面
+
+          ### 🐦🐧 新增支持平台
+          - macOS 应用程序包 (.app)
+          - Linux 可执行文件和 AppImage
+
+          ### 📦 下载文件
+          - **Windows**: `ImageTrim.exe`
+          - **macOS**: `ImageTrim.app` 或 `.dmg` 安装包
+          - **Linux**: `imagetrim` 可执行文件或 `.AppImage`
+
+          ### 🚀 使用方法
+          1. 下载对应平台的文件
+          2. Windows/macOS: 双击运行
+          3. Linux: `chmod +x imagetrim && ./imagetrim`
+
+          ---
+          🤖 自动构建于 GitHub Actions
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
