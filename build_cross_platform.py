@@ -66,8 +66,7 @@ def get_platform_specific_config():
                 "--exclude-module", "matplotlib",
                 "--exclude-module", "numpy.testing",
                 "--exclude-module", "scipy.tests",
-                "--osx-bundle-identifier", f"com.imagetrim.{PROJECT_NAME.lower()}",
-                "--info-plist", "build/macos/Info.plist"
+                "--osx-bundle-identifier", f"com.imagetrim.{PROJECT_NAME.lower()}"
             ]
         }
     elif current_platform == "linux":

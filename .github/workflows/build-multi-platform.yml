@@ -67,35 +67,7 @@ jobs:
         mkdir -p build/macos
         mkdir -p build/linux
 
-    - name: Create macOS Info.plist
-      if: matrix.platform == 'macos'
-      run: |
-        cat > build/macos/Info.plist << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleName</key>
-            <string>ImageTrim</string>
-            <key>CFBundleDisplayName</key>
-            <string>ImageTrim</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.imagetrim.imagetrim</string>
-            <key>CFBundleVersion</key>
-            <string>1.0.0</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
-            <key>CFBundleExecutable</key>
-            <string>ImageTrim</string>
-            <key>LSMinimumSystemVersion</key>
-            <string>10.14</string>
-            <key>NSHighResolutionCapable</key>
-            <true/>
-            <key>NSSupportsAutomaticGraphicsSwitching</key>
-            <true/>
-        </dict>
-        </plist>
-        EOF
+    # Info.plist will be handled by PyInstaller automatically
 
     - name: Create Linux .desktop file
       if: matrix.platform == 'linux'
@@ -116,13 +88,14 @@ jobs:
         EOF
 
     - name: Build application
+      shell: bash
       run: |
         echo "📁 Current directory contents:"
         ls -la
         echo "📁 App directory contents:"
         ls -la app/ || echo "App directory not found"
-        echo "🔧 Starting build..."
-        python build_cross_platform.py
+        echo "🔧 Starting build with simplified script..."
+        python build_simple.py
 
     - name: Create additional packages (Linux)
       if: matrix.platform == 'linux'
