@@ -49,7 +49,7 @@ def build_app():
 
     # 构建 PyInstaller 命令
     cmd = [
-        "pyinstaller",
+        sys.executable, "-m", "PyInstaller",
         "--onefile",
         "--windowed",
         "--name", config["name"],

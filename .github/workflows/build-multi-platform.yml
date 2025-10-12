@@ -110,7 +110,11 @@ jobs:
         echo "App directory contents:"
         ls -la app/ || echo "App directory not found"
         echo "Starting build with simplified script..."
-        .venv/bin/python build_simple.py
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          .venv/Scripts/python build_simple.py
+        else
+          .venv/bin/python build_simple.py
+        fi
 
     - name: Create additional packages (Linux)
       if: matrix.platform == 'linux'
