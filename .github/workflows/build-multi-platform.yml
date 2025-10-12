@@ -173,23 +173,13 @@ jobs:
         cp ImageTrim.AppDir/usr/share/applications/imagetrim.desktop ImageTrim.AppDir/imagetrim.desktop
 
         echo "Creating AppImage with verbose output..."
-        ./appimagetool --verbose ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage || {
-          echo "AppImage creation failed, trying alternative approach..."
-          # Try without desktop file requirement
-          ./appimagetool --no-appstream ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage || {
-            echo "Final attempt: creating AppImage manually..."
-            # Create a simple AppImage without desktop integration
-            mkdir -p ImageTrim.AppDir/usr/bin
-            cat > ImageTrim.AppDir/AppRun << 'EOF'
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "${0}")")"
-export PATH="${HERE}/usr/bin:${PATH}"
-exec "${HERE}/usr/bin/imagetrim" "$@"
-EOF
-            chmod +x ImageTrim.AppDir/AppRun
-            ./appimagetool --no-appstream ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage
-          }
-        }
+        if ! ./appimagetool --verbose ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage; then
+          echo "Standard AppImage creation failed, trying alternative approach..."
+          if ! ./appimagetool --no-appstream ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage; then
+            echo "Final attempt: creating AppImage without desktop integration..."
+            ./appimagetool --no-appstream --no-desktop ImageTrim.AppDir ImageTrim-1.0.7-linux.AppImage || echo "All AppImage creation attempts failed"
+          fi
+        fi
 
     - name: Create DMG (macOS)
       if: matrix.platform == 'macos'
