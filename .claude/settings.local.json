@@ -45,7 +45,10 @@
       "Bash(..venvScriptspython.exe:*)",
       "Bash(.venv/Scripts/python.exe:*)",
       "WebSearch",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(gh release create:*)",
+      "Bash(git tag:*)",
+      "Bash(gh release view:*)"
     ],
     "deny": [],
     "ask": []
