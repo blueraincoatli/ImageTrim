@@ -48,7 +48,8 @@
       "Bash(ping:*)",
       "Bash(gh release create:*)",
       "Bash(git tag:*)",
-      "Bash(gh release view:*)"
+      "Bash(gh release view:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
