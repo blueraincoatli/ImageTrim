@@ -1,0 +1,64 @@
+name: Test Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to test (windows/macos/linux)'
+        required: true
+        default: 'linux'
+        type: choice
+        options:
+        - linux
+        - macos
+        - windows
+
+jobs:
+  test-build:
+    runs-on: ${{ github.event.inputs.platform == 'linux' && 'ubuntu-latest' || github.event.inputs.platform == 'macos' && 'macos-latest' || 'windows-latest' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Create virtual environment
+      run: uv venv
+
+    - name: Install dependencies
+      run: |
+        uv pip install --upgrade pip
+        uv pip install -r requirements.txt
+        uv pip install pyinstaller
+
+    - name: Install system dependencies (Linux)
+      if: github.event.inputs.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-tk python3-dev libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libxcb-xinerama0
+
+    - name: Check project structure
+      run: |
+        echo "📁 Current directory:"
+        pwd
+        ls -la
+        echo "📁 App directory:"
+        ls -la app/ || echo "App directory not found"
+        echo "📁 App main:"
+        ls -la app/main.py || echo "Main file not found"
+
+    - name: Simple test build
+      run: |
+        echo "🔧 Running simple test build..."
+        pyinstaller --onefile --windowed --name ImageTrimTest app/main.py || echo "Build failed, checking logs"
+
+    - name: Check build output
+      run: |
+        echo "📁 Dist directory:"
+        ls -la dist/ || echo "Dist directory not found"
+        echo "📁 Build directory:"
+        ls -la build/ || echo "Build directory not found"
