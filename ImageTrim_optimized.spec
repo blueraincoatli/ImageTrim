@@ -212,28 +212,43 @@ else:
     icon_config = None
 
 # 可执行文件配置 - 优化版本
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='ImageTrim' if sys.platform != "win32" else 'ImageTrim.exe',
-    debug=False,  # 关闭调试模式
-    bootloader_ignore_signals=False,
-    strip=True,  # 启用符号剥离以减小体积
-    upx=True,  # 启用UPX压缩
-    upx_exclude=[],  # 排除UPX压缩的文件列表（空表示全部压缩）
-    runtime_tmpdir=None,
-    console=False,  # 无控制台窗口
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=icon_config if icon_config else None,
-)
+exe_kwargs = {
+    'pyz': pyz,
+    'a.scripts': a.scripts,
+    'a.binaries': a.binaries,
+    'a.zipfiles': a.zipfiles,
+    'a.datas': a.datas,
+    'exclude_binaries': False,
+    'name': 'ImageTrim' if sys.platform != "win32" else 'ImageTrim.exe',
+    'debug': False,  # 关闭调试模式
+    'bootloader_ignore_signals': False,
+    'strip': False,  # Windows不启用strip避免DLL问题
+    'upx': False,   # Windows暂时不启用UPX避免DLL加载问题
+    'upx_exclude': [],
+    'runtime_tmpdir': None,
+    'console': False,  # 无控制台窗口
+    'disable_windowed_traceback': False,
+    'argv_emulation': False,
+    'target_arch': None,
+    'codesign_identity': None,
+    'entitlements_file': None,
+}
+
+# Windows特殊配置
+if sys.platform == "win32":
+    exe_kwargs.update({
+        'strip': False,  # Windows不使用strip
+        'upx': False,    # Windows不使用UPX压缩
+        'exclude_binaries': False,
+        # 确保包含必要的PyQt6 DLL
+        'runtime_hooks': [],
+    })
+
+# 添加图标（如果有）
+if icon_config:
+    exe_kwargs['icon'] = icon_config
+
+exe = EXE(**exe_kwargs)
 
 # macOS应用包配置（仅在macOS上创建）
 if sys.platform == "darwin":

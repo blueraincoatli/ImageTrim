@@ -66,13 +66,18 @@ def build_with_spec():
     """使用优化的spec文件构建"""
     print(f"Building optimized {PROJECT_NAME} for {platform.system()}...")
 
-    # 使用spec文件构建
-    cmd = [
-        sys.executable, "-m", "PyInstaller",
-        "--clean",  # 清理之前的构建
-        "--noconfirm",  # 不询问确认
-        SPEC_FILE
-    ]
+    # Windows使用专用spec文件
+    if platform.system() == "Windows":
+        spec_file = "ImageTrim_windows.spec"
+    else:
+        spec_file = SPEC_FILE
+
+    if not os.path.exists(spec_file):
+        print(f"[ERROR] Spec file not found: {spec_file}")
+        return False
+
+    # 构建命令
+    cmd = [sys.executable, "-m", "PyInstaller", spec_file]
 
     print(f"Running: {' '.join(cmd)}")
 
