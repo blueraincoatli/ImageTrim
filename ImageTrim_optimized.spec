@@ -207,48 +207,42 @@ else:  # Linux
 for icon_path in icon_files:
     if os.path.exists(icon_path):
         icon_config = icon_path
-        print(f"Using icon: {icon_path}")
         break
 else:
-    print("No icon file found, building without icon")
     icon_config = None
 
 # 可执行文件配置 - 优化版本
-exe_kwargs = {
-    'pyz': pyz,
-    'a.scripts': a.scripts,
-    'a.binaries': a.binaries,
-    'a.zipfiles': a.zipfiles,
-    'a.datas': a.datas,
-    'exclude_binaries': False,
-    'name': 'ImageTrim' if sys.platform != "win32" else 'ImageTrim.exe',
-    'debug': False,  # 关闭调试模式
-    'bootloader_ignore_signals': False,
-    'strip': True,  # 启用符号剥离以减小体积
-    'upx': True,  # 启用UPX压缩
-    'upx_exclude': [],  # 排除UPX压缩的文件列表（空表示全部压缩）
-    'runtime_tmpdir': None,
-    'console': False,  # 无控制台窗口
-    'disable_windowed_traceback': False,
-    'argv_emulation': False,
-    'target_arch': None,
-    'codesign_identity': None,
-    'entitlements_file': None,
-}
-
-# 只有在有图标时才添加icon参数
-if icon_config:
-    exe_kwargs['icon'] = icon_config
-
-exe = EXE(**exe_kwargs)
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='ImageTrim' if sys.platform != "win32" else 'ImageTrim.exe',
+    debug=False,  # 关闭调试模式
+    bootloader_ignore_signals=False,
+    strip=True,  # 启用符号剥离以减小体积
+    upx=True,  # 启用UPX压缩
+    upx_exclude=[],  # 排除UPX压缩的文件列表（空表示全部压缩）
+    runtime_tmpdir=None,
+    console=False,  # 无控制台窗口
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=icon_config if icon_config else None,
+)
 
 # macOS应用包配置（仅在macOS上创建）
 if sys.platform == "darwin":
-    bundle_kwargs = {
-        'exe': exe,
-        'name': 'ImageTrim.app',
-        'bundle_identifier': 'com.imagetrim.imagetrim',
-        'info_plist': {
+    app = BUNDLE(
+        exe,
+        name='ImageTrim.app',
+        icon=icon_config if icon_config else None,
+        bundle_identifier='com.imagetrim.imagetrim',
+        info_plist={
             'CFBundleName': 'ImageTrim',
             'CFBundleDisplayName': 'ImageTrim',
             'CFBundleVersion': '1.1.5',
@@ -266,10 +260,4 @@ if sys.platform == "darwin":
                 }
             ]
         }
-    }
-
-    # 只有在有图标时才添加icon参数
-    if icon_config:
-        bundle_kwargs['icon'] = icon_config
-
-    app = BUNDLE(**bundle_kwargs)
+    )
