@@ -135,18 +135,28 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         # Check if build succeeded first
-        if [ ! -f "dist/imagetrim" ]; then
+        if [ ! -f "dist/ImageTrim" ] && [ ! -f "dist/imagetrim" ]; then
           echo "Error: Linux binary not found in dist/"
           ls -la dist/ || echo "dist directory not found"
           exit 1
         fi
+
+        # Find the actual binary name
+        BINARY_NAME=""
+        if [ -f "dist/ImageTrim" ]; then
+          BINARY_NAME="ImageTrim"
+        elif [ -f "dist/imagetrim" ]; then
+          BINARY_NAME="imagetrim"
+        fi
+
+        echo "Found Linux binary: $BINARY_NAME"
 
         # Create AppImage
         mkdir -p ImageTrim.AppDir/usr/bin
         mkdir -p ImageTrim.AppDir/usr/share/applications
         mkdir -p ImageTrim.AppDir/usr/share/icons/hicolor/256x256/apps
 
-        cp dist/imagetrim ImageTrim.AppDir/usr/bin/
+        cp dist/$BINARY_NAME ImageTrim.AppDir/usr/bin/imagetrim
 
         # Create desktop file directly in AppDir (don't rely on build/linux)
         cat > ImageTrim.AppDir/usr/share/applications/imagetrim.desktop << 'EOF'

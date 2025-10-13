@@ -191,7 +191,7 @@ a = Analysis(
 # 优化PYZ - 使用最高压缩级别
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
-# 跨平台图标配置
+# 跨平台图标配置 - 仅在文件存在时使用
 icon_config = None
 if sys.platform == "win32":
     icon_path = "app/resources/icons/imagetrim.ico"
@@ -200,8 +200,12 @@ elif sys.platform == "darwin":
 else:  # Linux
     icon_path = "app/resources/icons/imagetrim.png"
 
-if os.path.exists(icon_path):
+# 只有当图标文件存在时才使用
+if icon_path and os.path.exists(icon_path):
     icon_config = icon_path
+    print(f"Using icon: {icon_path}")
+else:
+    print(f"Icon not found: {icon_path}, building without icon")
 
 # 可执行文件配置 - 优化版本
 exe = EXE(
