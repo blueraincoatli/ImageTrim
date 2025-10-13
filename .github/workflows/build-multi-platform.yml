@@ -221,6 +221,7 @@ jobs:
         fi
 
     - name: Show build results
+      shell: bash
       run: |
         echo "=== Build Results for ${{ matrix.platform }} ==="
         echo "Contents of dist/:"
