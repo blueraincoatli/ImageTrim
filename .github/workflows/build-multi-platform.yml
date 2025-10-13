@@ -220,6 +220,18 @@ jobs:
           rm -rf dmg_temp
         fi
 
+    - name: Show build results
+      run: |
+        echo "=== Build Results for ${{ matrix.platform }} ==="
+        echo "Contents of dist/:"
+        ls -la dist/ || echo "dist directory not found"
+        echo ""
+        echo "Root directory files:"
+        ls -la *.AppImage *.dmg 2>/dev/null || echo "No AppImage or DMG files found"
+        echo ""
+        echo "Total size of dist/:"
+        du -sh dist/ 2>/dev/null || echo "Cannot size dist/"
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -229,6 +241,7 @@ jobs:
           *.AppImage
           *.dmg
         retention-days: 30
+        if-no-files-found: error
 
   create-release:
     needs: build
