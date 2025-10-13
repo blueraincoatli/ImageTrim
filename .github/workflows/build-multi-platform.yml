@@ -11,6 +11,9 @@ on:
         required: false
         default: 'v1.0.0'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -255,24 +258,35 @@ jobs:
 
         # Windows
         if [ -d "artifacts/windows-build" ]; then
-          cp artifacts/windows-build/*.exe release-assets/ 2>/dev/null || echo "No Windows exe found"
+          echo "Processing Windows artifacts:"
+          ls -la artifacts/windows-build/
+          find artifacts/windows-build/ -type f -name "*.exe" -exec cp {} release-assets/ \; || echo "No Windows exe found"
+          find artifacts/windows-build/ -type f -name "*.zip" -exec cp {} release-assets/ \; || echo "No Windows zip found"
         fi
 
         # macOS
         if [ -d "artifacts/macos-build" ]; then
-          cp artifacts/macos-build/*.app release-assets/ 2>/dev/null || echo "No macOS app found"
-          cp artifacts/macos-build/*.dmg release-assets/ 2>/dev/null || echo "No macOS dmg found"
+          echo "Processing macOS artifacts:"
+          ls -la artifacts/macos-build/
+          find artifacts/macos-build/ -type f -name "*.app" -exec cp -r {} release-assets/ \; || echo "No macOS app found"
+          find artifacts/macos-build/ -type f -name "*.dmg" -exec cp {} release-assets/ \; || echo "No macOS dmg found"
+          find artifacts/macos-build/ -type f -name "*.tar.gz" -exec cp {} release-assets/ \; || echo "No macOS tar.gz found"
         fi
 
         # Linux
         if [ -d "artifacts/linux-build" ]; then
-          cp artifacts/linux-build/imagetrim release-assets/ 2>/dev/null || echo "No Linux binary found"
-          cp artifacts/linux-build/ImageTrim release-assets/ 2>/dev/null || echo "No Linux binary found"
-          cp artifacts/linux-build/*.AppImage release-assets/ 2>/dev/null || echo "No Linux AppImage found"
+          echo "Processing Linux artifacts:"
+          ls -la artifacts/linux-build/
+          find artifacts/linux-build/ -type f -name "imagetrim" -exec cp {} release-assets/ \; || echo "No Linux binary found"
+          find artifacts/linux-build/ -type f -name "ImageTrim" -exec cp {} release-assets/ \; || echo "No Linux binary found"
+          find artifacts/linux-build/ -type f -name "*.AppImage" -exec cp {} release-assets/ \; || echo "No Linux AppImage found"
+          find artifacts/linux-build/ -type f -name "*.tar.gz" -exec cp {} release-assets/ \; || echo "No Linux tar.gz found"
         fi
 
         echo "=== Release Assets ==="
         ls -la release-assets/
+        echo "Total size:"
+        du -sh release-assets/
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
