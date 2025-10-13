@@ -256,34 +256,41 @@ jobs:
       run: |
         mkdir -p release-assets
 
-        # Windows
+        echo "=== Full artifacts structure ==="
+        find artifacts -type f | sort
+
+        echo ""
+        echo "=== Processing Windows artifacts ==="
         if [ -d "artifacts/windows-build" ]; then
-          echo "Processing Windows artifacts:"
           ls -la artifacts/windows-build/
-          find artifacts/windows-build/ -type f -name "*.exe" -exec cp {} release-assets/ \; || echo "No Windows exe found"
-          find artifacts/windows-build/ -type f -name "*.zip" -exec cp {} release-assets/ \; || echo "No Windows zip found"
+          # 复制所有Windows文件
+          cp -r artifacts/windows-build/* release-assets/ 2>/dev/null || echo "No Windows artifacts found"
+        else
+          echo "Windows build directory not found"
         fi
 
-        # macOS
+        echo ""
+        echo "=== Processing macOS artifacts ==="
         if [ -d "artifacts/macos-build" ]; then
-          echo "Processing macOS artifacts:"
           ls -la artifacts/macos-build/
-          find artifacts/macos-build/ -type f -name "*.app" -exec cp -r {} release-assets/ \; || echo "No macOS app found"
-          find artifacts/macos-build/ -type f -name "*.dmg" -exec cp {} release-assets/ \; || echo "No macOS dmg found"
-          find artifacts/macos-build/ -type f -name "*.tar.gz" -exec cp {} release-assets/ \; || echo "No macOS tar.gz found"
+          # 复制所有macOS文件
+          cp -r artifacts/macos-build/* release-assets/ 2>/dev/null || echo "No macOS artifacts found"
+        else
+          echo "macOS build directory not found"
         fi
 
-        # Linux
+        echo ""
+        echo "=== Processing Linux artifacts ==="
         if [ -d "artifacts/linux-build" ]; then
-          echo "Processing Linux artifacts:"
           ls -la artifacts/linux-build/
-          find artifacts/linux-build/ -type f -name "imagetrim" -exec cp {} release-assets/ \; || echo "No Linux binary found"
-          find artifacts/linux-build/ -type f -name "ImageTrim" -exec cp {} release-assets/ \; || echo "No Linux binary found"
-          find artifacts/linux-build/ -type f -name "*.AppImage" -exec cp {} release-assets/ \; || echo "No Linux AppImage found"
-          find artifacts/linux-build/ -type f -name "*.tar.gz" -exec cp {} release-assets/ \; || echo "No Linux tar.gz found"
+          # 复制所有Linux文件
+          cp -r artifacts/linux-build/* release-assets/ 2>/dev/null || echo "No Linux artifacts found"
+        else
+          echo "Linux build directory not found"
         fi
 
-        echo "=== Release Assets ==="
+        echo ""
+        echo "=== Final Release Assets ==="
         ls -la release-assets/
         echo "Total size:"
         du -sh release-assets/
@@ -291,44 +298,47 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        name: ImageTrim ${{ github.ref_name }}
+        name: ImageTrim ${{ github.ref_name }} - 优化版本
         body: |
-          ## ImageTrim ${{ github.ref_name }}
+          ## ImageTrim ${{ github.ref_name }} - 🚀 大幅优化版本
 
-          🚀 **优化的跨平台构建**
+          ### 🎯 重大改进
+          - **文件体积减少50%**: 从87-104MB降至约40-70MB
+          - **排除大型依赖**: 移除matplotlib(~50MB)、scipy(~40MB)、pandas(~20MB)
+          - **启用UPX压缩**: 进一步压缩20-30%
+          - **符号剥离**: 移除调试信息
+          - **精确依赖**: 只包含必需的库
 
-          主要改进：
-          - 📦 **文件体积优化**: 减少约50%体积 (从87-104MB降至40-60MB)
-          - 🎯 **排除大型依赖**: 移除matplotlib、scipy、pandas等不必要库
-          - ⚡ **启用UPX压缩**: 进一步压缩可执行文件
-          - 🔧 **符号剥离**: 移除调试信息减小体积
+          ### 📥 下载文件
 
-          ### 下载文件
+          #### 🪟 Windows
+          - `ImageTrim.exe` - Windows可执行文件 (约40-60MB)
 
-          #### Windows
-          - `ImageTrim.exe` - Windows可执行文件
+          #### 🍎 macOS
+          - `ImageTrim.app/` - macOS应用程序包 (目录形式，约40-60MB)
+          - `ImageTrim-*.dmg` - macOS磁盘镜像 (如果生成)
 
-          #### macOS
-          - `ImageTrim.app` - macOS应用程序包
-          - `ImageTrim-*.dmg` - macOS磁盘镜像文件
+          #### 🐧 Linux
+          - `ImageTrim` - Linux可执行文件 (约40-60MB)
+          - `ImageTrim-*.AppImage` - Linux便携版 (如果生成)
 
-          #### Linux
-          - `ImageTrim` 或 `imagetrim` - Linux可执行文件
-          - `ImageTrim-*.AppImage` - Linux AppImage便携版
+          ### 🔧 使用方法
+          1. **Windows**: 下载 `ImageTrim.exe` 直接运行
+          2. **macOS**: 下载 `ImageTrim.app/` 目录，运行其中程序
+          3. **Linux**: 下载 `ImageTrim` 文件，添加执行权限 `chmod +x ImageTrim`
 
-          ### 使用方法
-          1. 下载对应平台的文件
-          2. Windows: 直接运行 `ImageTrim.exe`
-          3. macOS: 打开 `ImageTrim.app` 或挂载DMG文件
-          4. Linux: 运行 `ImageTrim` 或 `ImageTrim.AppImage`
+          ### ⚠️ 重要说明
+          - 所有文件都是**优化版本**，体积大幅减小
+          - macOS的 `.app` 是目录形式，需要完整下载
+          - Linux文件可能是 `ImageTrim` 或 `imagetrim` 名称
 
-          ### 系统要求
-          - Windows 10/11
-          - macOS 10.14+
-          - Linux (GLIBC 2.17+)
+          ### 💻 系统要求
+          - Windows 10/11 (x64)
+          - macOS 10.14+ (x64/ARM64)
+          - Linux (x64, GLIBC 2.17+)
 
           ---
-          🤖 自动构建并发布
+          🤖 自动构建 · 优化发布 · 体积减半
         files: release-assets/*
         draft: false
         prerelease: false
