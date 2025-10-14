@@ -188,6 +188,22 @@ class ImagePathTooltip(QFrame):
         if new_width != current_width or new_height != current_height:
             self.setFixedSize(new_width, new_height)
 
+    def _close_and_notify(self):
+        parent = self.parent()
+        if parent and hasattr(parent, "tooltip_closed"):
+            parent.tooltip_closed()
+        if self.isVisible():
+            self.hide()
+        self.deleteLater()
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        self._close_and_notify()
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self._close_and_notify()
+
 
 
 
@@ -409,12 +425,12 @@ class DuplicateImageWidget(QFrame):
                 if screen:
                     screen_geometry = screen.availableGeometry()
                     # 计算最佳位置，避免超出屏幕边界
-                    x = min(mouse_pos.x() + 10, screen_geometry.right() - tooltip_width - 10)
-                    y = max(mouse_pos.y() - tooltip_height - 10, screen_geometry.top() + 10)
+                    x = min(mouse_pos.x() + 15, screen_geometry.right() - tooltip_width - 10)
+                    y = min(mouse_pos.y() + 15, screen_geometry.bottom() - tooltip_height - 10)
                     self._tooltip.move(x, y)
                 else:
                     # 如果无法获取屏幕信息，使用简单定位
-                    self._tooltip.move(mouse_pos.x() + 10, mouse_pos.y() - 50)
+                    self._tooltip.move(mouse_pos.x() + 15, mouse_pos.y() + 15)
                 self._tooltip.show()
             except Exception as e:
                 # 如果显示提示出错，不显示提示但不中断程序
@@ -440,10 +456,11 @@ class DuplicateImageWidget(QFrame):
                 # 如果设置定时器出错，立即隐藏
                 print(f"设置悬浮提示隐藏定时器时出错: {e}")
                 try:
-                    self._tooltip.hide()
+                    if self._tooltip.isVisible():
+                        self._tooltip.hide()
                     self._tooltip.deleteLater()
-                except:
-                    pass
+                except Exception as inner_exc:  # pylint: disable=broad-except
+                    print(f"立即隐藏悬浮提示时出错: {inner_exc}")
                 self._tooltip = None
         
     def _hide_tooltip(self):
@@ -456,12 +473,16 @@ class DuplicateImageWidget(QFrame):
                     from PyQt6.QtCore import QTimer
                     QTimer.singleShot(200, self._hide_tooltip)
                     return
-                self._tooltip.hide()
+                if self._tooltip.isVisible():
+                    self._tooltip.hide()
                 self._tooltip.deleteLater()
             except Exception as e:
                 print(f"隐藏悬浮提示时出错: {e}")
             finally:
                 self._tooltip = None
+
+    def tooltip_closed(self):
+        self._tooltip = None
 
 
 class DuplicateGroupWidget(QFrame):
@@ -469,6 +490,8 @@ class DuplicateGroupWidget(QFrame):
 
     selection_changed = pyqtSignal(list, bool)
     image_double_clicked = pyqtSignal(str)
+
+    _STACK_ASPECT_RATIO = 4 / 3
 
     _BASE_STYLE = """
         QFrame {
@@ -524,7 +547,7 @@ class DuplicateGroupWidget(QFrame):
         self.stack_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self.images_layout.addWidget(self.stack_widget)
 
-        self.badge_label = QLabel(self.stack_widget)
+        self.badge_label = QLabel(self)
         self.badge_label.setVisible(False)
         self.badge_label.setStyleSheet("""
             QLabel {
@@ -587,6 +610,8 @@ class DuplicateGroupWidget(QFrame):
             self.badge_label.hide()
             return
 
+        total_count = len(self.files)
+
         # 根据文件数量调整显示方式
         if len(self.files) == 1:
             # 只有一张图片，居中显示
@@ -602,7 +627,6 @@ class DuplicateGroupWidget(QFrame):
                 widget.move(x_pos, y_pos)
                 widget.show()
                 widget.raise_()
-            self.badge_label.hide()
         elif len(self.files) == 2:
             # 两张图片并列显示，使用更多空间
             if len(self.image_widgets) >= 2:
@@ -626,7 +650,6 @@ class DuplicateGroupWidget(QFrame):
                 widget2.move(x_pos, y_pos)
                 widget2.show()
                 widget2.raise_()
-            self.badge_label.hide()
         else:
             # 三张或更多图片：第一张单独显示，其余堆叠显示
             # 第一张图片放在左边，使用更多空间
@@ -654,12 +677,17 @@ class DuplicateGroupWidget(QFrame):
                 max_display = min(remaining_count, 5)
                 overlap = min(max(5, int(right_area_width // 15)), 20)
                 
-                # 计算堆叠图片的尺寸
-                stacked_thumb_width = max(40, right_area_width - overlap * (max_display - 1) - 10)
-                stacked_thumb_height = max(40, right_area_height - 10)
-                
-                base_x = right_area_x + max(0, (right_area_width - stacked_thumb_width - overlap * (max_display - 1)) // 2)
-                base_y = right_area_y + max(0, (right_area_height - stacked_thumb_height) // 2)
+                available_width = max(40, right_area_width - 10)
+                available_height = max(40, right_area_height - 10)
+                stacked_thumb_width, stacked_thumb_height = self._fit_size_with_aspect(
+                    max(40, available_width - overlap * (max_display - 1)),
+                    available_height,
+                    self._STACK_ASPECT_RATIO,
+                )
+                total_stack_width = stacked_thumb_width + overlap * (max_display - 1)
+                total_stack_height = stacked_thumb_height + overlap * (max_display - 1)
+                base_x = right_area_x + max(0, (right_area_width - total_stack_width) // 2)
+                base_y = right_area_y + max(0, (right_area_height - total_stack_height) // 2)
                 
                 # 显示堆叠的图片
                 for i in range(max_display):
@@ -674,18 +702,8 @@ class DuplicateGroupWidget(QFrame):
                 for i in reversed(range(min(max_display, remaining_count))):
                     if (i + 1) < len(self.image_widgets):
                         self.image_widgets[i + 1].raise_()
-                
-                # 显示数量角标（如果超过5张）
-                if remaining_count > 5:
-                    remaining = remaining_count - 5 + 1
-                    self.badge_label.setText(f"×{remaining}")
-                    self.badge_label.adjustSize()
-                    badge_x = right_area_x + right_area_width - self.badge_label.width() - 5
-                    badge_y = right_area_y + 5
-                    self.badge_label.move(max(right_area_x + 5, badge_x), max(right_area_y + 5, badge_y))
-                    self.badge_label.show()
-                else:
-                    self.badge_label.hide()
+
+        self._update_badge(total_count, card_width, padding)
 
     def refresh_thumbnails(self):
         for widget in self.image_widgets:
@@ -723,6 +741,37 @@ class DuplicateGroupWidget(QFrame):
 
     def badge_text(self) -> str:
         return self.badge_label.text() if self.badge_label else ''
+
+    def _update_badge(self, total_count: int, card_width: int, padding: int):
+        if not self.badge_label or not self.stack_widget:
+            return
+        remaining_count = max(0, total_count - 1)
+        if remaining_count <= 1:
+            self.badge_label.hide()
+            return
+
+        self.badge_label.setText(f"×{remaining_count}")
+        self.badge_label.adjustSize()
+
+        badge_x = max(padding, card_width - self.badge_label.width() - padding)
+        badge_y = padding
+        self.badge_label.move(badge_x, badge_y)
+        self.badge_label.raise_()
+        self.badge_label.show()
+
+    @staticmethod
+    def _fit_size_with_aspect(max_width: int, max_height: int, aspect: float) -> Tuple[int, int]:
+        if max_width <= 0 or max_height <= 0 or aspect <= 0:
+            return max(1, max_width), max(1, max_height)
+        height = min(max_height, int(max_width / aspect)) or 1
+        width = min(max_width, int(height * aspect)) or 1
+        if width > max_width:
+            width = max_width
+            height = max(1, int(width / aspect))
+        if height > max_height:
+            height = max_height
+            width = max(1, int(height * aspect))
+        return max(1, width), max(1, height)
 
 
 class DeduplicationResultsPanel(QWidget):

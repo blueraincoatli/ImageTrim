@@ -4,7 +4,7 @@
 """
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QStackedWidget,
-                             QFrame, QGraphicsDropShadowEffect)
+                             QFrame, QGraphicsDropShadowEffect, QSizePolicy)
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 from app.core.function_manager import FunctionManager
@@ -30,6 +30,7 @@ class SettingsPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
         layout.setSpacing(Spacing.MD)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
         # 标题
         self.title = QLabel("⚙️ 设置与进度")
@@ -46,7 +47,7 @@ class SettingsPanel(QWidget):
 
         # 设置区域容器 - 简化边框，使用阴影效果
         container = QFrame()
-        container.setMaximumHeight(300)  # 限制最大高度，避免遮挡功能卡片
+        container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         container.setStyleSheet(f"""
             QFrame {{
                 background-color: {Theme.BG_MEDIUM};
@@ -68,8 +69,9 @@ class SettingsPanel(QWidget):
 
         # 设置区域
         self.stacked_widget = QStackedWidget()
+        self.stacked_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         container_layout.addWidget(self.stacked_widget)
-        layout.addWidget(container)
+        layout.addWidget(container, 1)
 
         # 添加关于信息作为默认显示
         about_widget = AboutWidget()
