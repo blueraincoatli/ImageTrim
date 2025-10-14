@@ -358,6 +358,17 @@ class DeduplicationModule(BaseFunctionModule):
             
         return self.workspace_ui
 
+    def reset_workspace_view(self):
+        """重置工作区界面，切换回拖拽区域并清空结果"""
+        if hasattr(self, "results_panel") and self.results_panel:
+            try:
+                self.results_panel.reset_view()
+            except Exception as exc:  # pylint: disable=broad-except
+                print(f"重置结果面板时出错: {exc}")
+
+        if hasattr(self, "workspace_stacked_widget"):
+            self.workspace_stacked_widget.setCurrentIndex(0)
+
     def add_path(self):
         """添加扫描路径"""
         # 直接选择目录，不使用文件选择对话框
@@ -388,6 +399,8 @@ class DeduplicationModule(BaseFunctionModule):
         # 如果没有路径了，禁用扫描按钮
         if not self.scan_paths:
             self.scan_stop_btn.setEnabled(False)
+            if not self.is_scanning:
+                self.reset_workspace_view()
 
     def clear_paths(self):
         """清空所有路径"""
@@ -400,6 +413,9 @@ class DeduplicationModule(BaseFunctionModule):
 
         # 禁用扫描按钮
         self.scan_stop_btn.setEnabled(False)
+
+        if not self.is_scanning:
+            self.reset_workspace_view()
 
     def toggle_scan(self):
         """切换扫描状态"""
@@ -438,6 +454,8 @@ class DeduplicationModule(BaseFunctionModule):
         """)
         
         # 切换到结果面板
+        if hasattr(self, "results_panel") and self.results_panel:
+            self.results_panel.reset_view()
         if hasattr(self, "workspace_stacked_widget"):
             self.workspace_stacked_widget.setCurrentIndex(1)
         
@@ -510,8 +528,7 @@ class DeduplicationModule(BaseFunctionModule):
         self.progress_updated.emit(0, "已停止")
         
         # 切换回拖拽区域
-        if hasattr(self, "workspace_stacked_widget"):
-            self.workspace_stacked_widget.setCurrentIndex(0)
+        self.reset_workspace_view()
     
     def on_scan_finished(self, result_data):
         """

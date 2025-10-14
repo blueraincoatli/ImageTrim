@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushBut
                              QTextEdit, QScrollArea, QGridLayout, QProgressBar,
                              QFrame, QCheckBox, QSplitter, QFileDialog, QMessageBox,
                              QApplication, QDialog, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
-                             QSlider, QRubberBand)
+                             QSlider, QRubberBand, QGraphicsDropShadowEffect)
 from PyQt6.QtWidgets import QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QCoreApplication, QEvent, QPoint, QRect
 from PyQt6.QtGui import QPixmap, QImage, QKeySequence, QShortcut, QPainter, QColor, QPen, QScreen, QCursor
@@ -244,6 +244,12 @@ class DuplicateImageWidget(QFrame):
                 qproperty-alignment: AlignCenter;
             }
         """)
+
+        self._shadow_effect = QGraphicsDropShadowEffect(self.image_label)
+        self._shadow_effect.setBlurRadius(18)
+        self._shadow_effect.setOffset(0, 4)
+        self._shadow_effect.setColor(QColor(0, 0, 0, 140))
+        self.image_label.setGraphicsEffect(self._shadow_effect)
         layout.addWidget(self.image_label)
 
         try:
@@ -786,6 +792,7 @@ class DeduplicationResultsPanel(QWidget):
         self.selected_files = set()  # 存储选中的文件
         self.grid_size = 3  # 网格列数 (1-8)
         self.thumbnail_size = 120  # 缩略图大小
+        self._placeholder_label: Optional[QLabel] = None
 
         # 获取DPI缩放因子
         self.dpi_scale_factor = self.get_dpi_scale_factor()
@@ -1060,6 +1067,9 @@ class DeduplicationResultsPanel(QWidget):
         
         # 设置分割器比例
         self.splitter.setSizes([700, 200])
+
+        # 初始化为空态视图
+        self.reset_view()
         
     def connect_signals(self):
         """连接信号"""
@@ -1214,31 +1224,21 @@ class DeduplicationResultsPanel(QWidget):
         
     def show_results(self, result_data: dict):
         """显示结果"""
-        # 清除现有结果
-        for i in reversed(range(self.grid_layout.count())):
-            widget = self.grid_layout.itemAt(i).widget()
-            if widget:
-                widget.setParent(None)
-                # 断开信号连接
-                if hasattr(widget, 'selection_changed'):
-                    try:
-                        widget.selection_changed.disconnect()
-                    except:
-                        pass
-                if hasattr(widget, 'image_double_clicked'):
-                    try:
-                        widget.image_double_clicked.disconnect()
-                    except:
-                        pass
-        self.duplicate_groups.clear()
+        self._clear_results_grid()
+
         self.selected_files.clear()
         self.update_selection_count()
+        self.delete_btn.setEnabled(False)
+        self.move_btn.setEnabled(False)
+        self.select_all_btn.setEnabled(False)
+        self.unselect_all_btn.setEnabled(False)
 
         # 显示新结果
         duplicates = result_data.get('duplicates', {})
         if duplicates:
+            self._hide_placeholder()
             # 使用滑块定义的列数
-            columns = self.grid_size  # 直接使用用户设置的列数
+            columns = max(1, self.grid_size)  # 直接使用用户设置的列数
 
             # 计算每列的精确宽度（容器总宽度 / 列数）
             container_width = self.scroll_area.viewport().width()
@@ -1281,12 +1281,11 @@ class DeduplicationResultsPanel(QWidget):
             
             # 再次刷新以确保所有缩略图都加载完成
             QTimer.singleShot(500, self.force_thumbnail_refresh)
+
+            self.select_all_btn.setEnabled(True)
+            self.unselect_all_btn.setEnabled(True)
         else:
-            # 显示没有找到重复项的消息
-            no_result_label = QLabel("未找到重复图片")
-            no_result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            no_result_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold; padding: 50px;")
-            self.grid_layout.addWidget(no_result_label)
+            self._show_placeholder("\u672a\u627e\u5230\u91cd\u590d\u56fe\u7247\u3002\u8bf7\u8c03\u6574\u8def\u5f84\u6216\u9608\u503c\u540e\u91cd\u8bd5\u3002")
             
     def on_group_selection_changed(self, files, is_selected):
         payload = files[1:] if len(files) > 1 else []
@@ -1349,6 +1348,76 @@ class DeduplicationResultsPanel(QWidget):
         self.update_selection_count()
         self.delete_btn.setEnabled(False)
         self.move_btn.setEnabled(False)
+
+    def reset_view(self):
+        """重置结果面板为初始状态"""
+        self._clear_results_grid()
+        self.selected_files.clear()
+        self.update_selection_count()
+        self.delete_btn.setEnabled(False)
+        self.move_btn.setEnabled(False)
+        self.select_all_btn.setEnabled(False)
+        self.unselect_all_btn.setEnabled(False)
+
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("准备就绪")
+
+        self.log_text.clear()
+        self.log_area.setVisible(False)
+        self.log_btn.setChecked(False)
+        self.log_btn.setText("📋 日志")
+
+        self._show_placeholder("\u62d6\u62fd\u6587\u4ef6\u5939\u5230\u5de6\u4fa7\u533a\u57df\uff0c\u6216\u5728\u5de6\u4fa7\u6dfb\u52a0\u626b\u63cf\u8def\u5f84\u4ee5\u5f00\u59cb\u65b0\u7684\u626b\u63cf\u3002")
+
+    def _clear_results_grid(self):
+        """移除结果网格中的所有控件"""
+        self._hide_placeholder()
+        for i in reversed(range(self.grid_layout.count())):
+            item = self.grid_layout.itemAt(i)
+            if not item:
+                continue
+            widget = item.widget()
+            if not widget:
+                continue
+            if hasattr(widget, 'selection_changed'):
+                try:
+                    widget.selection_changed.disconnect()
+                except Exception:
+                    pass
+            if hasattr(widget, 'image_double_clicked'):
+                try:
+                    widget.image_double_clicked.disconnect()
+                except Exception:
+                    pass
+            widget.setParent(None)
+        self.duplicate_groups.clear()
+
+    def _show_placeholder(self, message: str):
+        if not self._placeholder_label:
+            self._placeholder_label = QLabel()
+            self._placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._placeholder_label.setWordWrap(True)
+            self._placeholder_label.setStyleSheet(
+                "color: white; font-size: 16px; font-weight: bold; padding: 48px;"
+            )
+        self._placeholder_label.setText(message)
+        if self._placeholder_label.parent() is None:
+            self.grid_layout.addWidget(
+                self._placeholder_label,
+                0,
+                0,
+                1,
+                1,
+                Qt.AlignmentFlag.AlignCenter,
+            )
+        self._placeholder_label.show()
+
+    def _hide_placeholder(self):
+        if not self._placeholder_label:
+            return
+        if self._placeholder_label.parent() is not None:
+            self.grid_layout.removeWidget(self._placeholder_label)
+        self._placeholder_label.hide()
 
     def delete_selected(self):
         """删除选中文件 - 按重复组仅保留第一张，其余文件执行删除"""
