@@ -77,9 +77,7 @@ class DragDropArea(QFrame):
                 color: #FFFFFF;
                 font-size: 22px;
                 font-weight: bold;
-                padding: 14px 28px;
-                border-radius: 14px;
-                background-color: rgba(0, 0, 0, 0.5);
+                margin: 0px;
             }
         """)
         placeholder_layout.addWidget(title_label)

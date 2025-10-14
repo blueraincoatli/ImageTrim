@@ -15,6 +15,62 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from app.ui.theme import Theme
 
 
+# 全局变量用于存储预加载的图片和加载状态
+preloaded_pixmap = None
+preloaded_image_loading_completed = False
+early_image_loader = None
+
+
+class GlobalImageLoader:
+    """全局图片加载控制器"""
+    
+    _instance = None
+    _lock = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._lock = None
+        return cls._instance
+    
+    def __init__(self):
+        # Only initialize once
+        if not hasattr(self, 'initialized'):
+            self.initialized = True
+            self.preloaded_pixmap = None
+            self.loading_completed = False
+            self.image_loader = None
+    
+    def start_early_download(self):
+        """启动早期图片下载"""
+        if self.image_loader is None or not self.image_loader.isRunning():
+            self.image_loader = ImageLoader()
+            # Connect to store the result in global variables
+            self.image_loader.image_loaded.connect(self._on_image_loaded)
+            self.image_loader.loading_completed.connect(self._on_loading_completed)
+            self.image_loader.start()
+    
+    def _on_image_loaded(self, pixmap: QPixmap):
+        """图片加载完成回调"""
+        global preloaded_pixmap
+        self.preloaded_pixmap = pixmap
+        preloaded_pixmap = pixmap  # Update global variable too
+    
+    def _on_loading_completed(self):
+        """加载完成回调"""
+        global preloaded_image_loading_completed
+        self.loading_completed = True
+        preloaded_image_loading_completed = True
+    
+    def get_preloaded_image(self):
+        """获取预加载的图片"""
+        return self.preloaded_pixmap if self.preloaded_pixmap else None
+    
+    def is_loading_completed(self):
+        """检查是否加载完成"""
+        return self.loading_completed
+
+
 class ImageLoader(QThread):
     """异步图片加载线程"""
 
@@ -79,6 +135,11 @@ class ImageLoader(QThread):
                         continue
 
                     print(f"成功转换图片，尺寸 {pixmap.width()}x{pixmap.height()}")
+                    
+                    # 保存到全局变量供后续使用
+                    global preloaded_pixmap
+                    preloaded_pixmap = pixmap
+                    
                     self.image_loaded.emit(pixmap)
                     self.loading_completed.emit()
                     return
@@ -102,7 +163,7 @@ class WelcomeScreen(QWidget):
 
     image_loading_completed = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, preloaded_pixmap_arg=None):
         super().__init__(parent)
         self.image_loader: ImageLoader | None = None
         self.original_pixmap: QPixmap | None = None
@@ -114,7 +175,29 @@ class WelcomeScreen(QWidget):
             }}
         """
         self.init_ui()
-        self.load_image()
+        
+        # Check if a preloaded pixmap is available through the global loader
+        from .welcome_screen import GlobalImageLoader
+        global_loader = GlobalImageLoader()
+        
+        # Check if a preloaded pixmap is available either as parameter or globally
+        if preloaded_pixmap_arg is not None and not preloaded_pixmap_arg.isNull():
+            print("欢迎屏幕: 使用传入的预加载图片")
+            self.on_image_loaded(preloaded_pixmap_arg)
+            self.on_loading_completed()
+        elif global_loader.is_loading_completed() and global_loader.get_preloaded_image() is not None:
+            print("欢迎屏幕: 使用全局预加载的图片")
+            self.on_image_loaded(global_loader.get_preloaded_image())
+            self.on_loading_completed()
+        else:
+            # If early download is still in progress, wait for it; otherwise start new download
+            if global_loader.image_loader and global_loader.image_loader.isRunning():
+                print("欢迎屏幕: 早期下载仍在进行，等待结果...")
+                global_loader.image_loader.image_loaded.connect(self.on_image_loaded)
+                global_loader.image_loader.loading_completed.connect(self.on_loading_completed)
+            else:
+                print("欢迎屏幕: 开始新的图片下载")
+                self.load_image()
 
     def init_ui(self) -> None:
         """初始化UI"""

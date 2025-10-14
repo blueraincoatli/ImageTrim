@@ -139,14 +139,14 @@ class MainWindow(QMainWindow):
         """)
         
     def register_modules(self):
-        """注册功能模块"""
-        # 注册图片去重模块
-        dedup_module = DeduplicationModule()
-        self.function_manager.register_module(dedup_module)
+        """注册功能模块 - 懒加载版本"""
+        # 使用模块构造函数注册，实现懒加载
+        from app.modules.deduplication import DeduplicationModule
+        from app.modules.avif_converter import AVIFConverterModule
         
-        # 注册AVIF转换模块
-        avif_module = AVIFConverterModule()
-        self.function_manager.register_module(avif_module)
+        # 注册模块构造函数，而不是立即实例化
+        self.function_manager.register_module_constructor("deduplication", DeduplicationModule, "图片去重")
+        self.function_manager.register_module_constructor("avif_converter", AVIFConverterModule, "AVIF转换")
         
         # 更新功能面板
         self.function_panel.update_modules()

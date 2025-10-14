@@ -4,9 +4,18 @@
 负责功能模块的注册、激活和管理
 """
 
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Callable
 from PyQt6.QtCore import QObject, pyqtSignal
 from .base_module import BaseFunctionModule
+
+
+class ModuleInfo:
+    """模块信息类，用于懒加载时存储模块元数据"""
+    def __init__(self, name: str, display_name: str, icon: str = "", description: str = ""):
+        self.name = name
+        self.display_name = display_name
+        self.icon = icon
+        self.description = description
 
 
 class FunctionManager(QObject):
@@ -21,6 +30,8 @@ class FunctionManager(QObject):
     def __init__(self):
         super().__init__()
         self.modules: Dict[str, BaseFunctionModule] = {}
+        self.module_constructors: Dict[str, Callable[[], BaseFunctionModule]] = {}
+        self.module_infos: Dict[str, ModuleInfo] = {}
         self.active_module: Optional[BaseFunctionModule] = None
 
     def register_module(self, module: BaseFunctionModule) -> bool:
@@ -36,6 +47,40 @@ class FunctionManager(QObject):
         if module.name in self.modules:
             return False
         self.modules[module.name] = module
+        return True
+
+    def register_module_constructor(self, name: str, constructor: Callable[[], BaseFunctionModule], display_name: str = None) -> bool:
+        """
+        注册功能模块构造函数（用于懒加载）
+
+        Args:
+            name: 模块名称
+            constructor: 模块构造函数
+            display_name: 显示名称
+
+        Returns:
+            bool: 注册是否成功
+        """
+        if name in self.module_constructors:
+            return False
+        
+        # 临时创建模块实例以获取元数据，但不保存实例
+        temp_module = constructor()
+        if display_name:
+            display_name_to_use = display_name
+        else:
+            display_name_to_use = temp_module.display_name
+            
+        # 存储模块信息
+        self.module_infos[name] = ModuleInfo(
+            name=temp_module.name,
+            display_name=display_name_to_use,
+            icon=getattr(temp_module, 'icon', ''),
+            description=getattr(temp_module, 'description', '')
+        )
+        
+        # 保存构造函数
+        self.module_constructors[name] = constructor
         return True
 
     def unregister_module(self, name: str) -> bool:
@@ -63,6 +108,13 @@ class FunctionManager(QObject):
         Returns:
             bool: 激活是否成功
         """
+        # 如果模块尚未加载，但有构造函数，则创建实例
+        if name not in self.modules and name in self.module_constructors:
+            # 使用构造函数创建模块实例
+            constructor = self.module_constructors[name]
+            module = constructor()
+            self.modules[name] = module
+
         if name not in self.modules:
             return False
 
@@ -89,12 +141,14 @@ class FunctionManager(QObject):
 
     def get_module_names(self) -> List[str]:
         """
-        获取所有模块名称
+        获取所有模块名称（包括已加载的和懒加载的）
 
         Returns:
             List[str]: 模块名称列表
         """
-        return list(self.modules.keys())
+        all_names = set(self.modules.keys())
+        all_names.update(self.module_constructors.keys())
+        return list(all_names)
 
     def get_module(self, name: str) -> Optional[BaseFunctionModule]:
         """
@@ -106,7 +160,45 @@ class FunctionManager(QObject):
         Returns:
             BaseFunctionModule: 模块实例，如果不存在则返回None
         """
+        # 如果模块尚未加载但有构造函数，则先加载模块
+        if name not in self.modules and name in self.module_constructors:
+            constructor = self.module_constructors[name]
+            module = constructor()
+            self.modules[name] = module
+        
         return self.modules.get(name)
+    
+    def get_module_display_info(self, name: str) -> Optional[Dict[str, str]]:
+        """
+        获取模块显示信息（不加载完整模块）
+
+        Args:
+            name: 模块名称
+
+        Returns:
+            Dict: 包含display_name等显示信息的字典
+        """
+        # 如果模块已加载，从实例获取信息
+        if name in self.modules:
+            module = self.modules[name]
+            return {
+                'name': module.name,
+                'display_name': module.display_name,
+                'icon': getattr(module, 'icon', ''),
+                'description': getattr(module, 'description', '')
+            }
+        
+        # 如果有模块信息（懒加载注册时保存的），从那里获取
+        if name in self.module_infos:
+            info = self.module_infos[name]
+            return {
+                'name': info.name,
+                'display_name': info.display_name,
+                'icon': info.icon,
+                'description': info.description
+            }
+        
+        return None
 
     def get_active_module(self) -> Optional[BaseFunctionModule]:
         """

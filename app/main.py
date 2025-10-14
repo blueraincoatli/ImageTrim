@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QFontDatabase
 from app.ui.main_window import MainWindow
+from app.ui.welcome_screen import ImageLoader
 from app.ui.theme import Theme, FontSize
 
 
@@ -185,6 +186,11 @@ def setup_theme(app, font_family):
 
 def main():
     app = QApplication(sys.argv)
+
+    # 启动时立即开始下载随机图片，与UI初始化并行进行
+    from app.ui.welcome_screen import GlobalImageLoader
+    image_loader_controller = GlobalImageLoader()
+    image_loader_controller.start_early_download()
 
     # 设置字体并获取选中的字体家族
     font_family = setup_font(app)

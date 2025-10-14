@@ -437,7 +437,7 @@ class WorkspacePanel(QWidget):
         layout.addWidget(self.stacked_widget)
 
         # 添加欢迎屏幕作为默认显示
-        welcome_widget = WelcomeScreen()
+        welcome_widget = WelcomeScreen()  # Use default constructor
         self.welcome_screen = welcome_widget  # 保存引用以便连接信号
 
         # 连接欢迎屏幕的图片加载完成信号
