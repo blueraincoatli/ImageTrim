@@ -4,9 +4,10 @@
 """
 
 import os
+from pathlib import Path
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                              QFrame, QFileDialog, QListWidget, QAbstractItemView,
-                             QTableWidget, QTableWidgetItem, QHeaderView)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QSizePolicy)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent
 from app.ui.theme import Spacing
@@ -23,6 +24,12 @@ class DragDropArea(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.scanned_paths = []  # 存储已扫描路径的统计信息
+        self._has_paths = False
+        self._background_image = self._resolve_resource("images/greyBG.jpg")
+        self._style_empty = self._build_style(empty=True, highlight=False)
+        self._style_active = self._build_style(empty=False, highlight=False)
+        self._style_drag_empty = self._build_style(empty=True, highlight=True)
+        self._style_drag_active = self._build_style(empty=False, highlight=True)
         self.init_ui()
         
     def init_ui(self):
@@ -30,18 +37,7 @@ class DragDropArea(QFrame):
         # 设置框架样式
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         self.setLineWidth(2)
-        self.setStyleSheet("""
-            DragDropArea {
-                background-color: #2d2d30;
-                border: 2px dashed #555555;
-                border-radius: 10px;
-                min-height: 200px;
-            }
-            DragDropArea:hover {
-                border: 2px dashed #FF8C00;
-                background-color: #333337;
-            }
-        """)
+        self._apply_default_style()
         
         # 启用拖拽功能
         self.setAcceptDrops(True)
@@ -51,33 +47,61 @@ class DragDropArea(QFrame):
         layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
         layout.setSpacing(Spacing.MD)
         
+        # 空态占位容器
+        self.placeholder_container = QFrame()
+        self.placeholder_container.setObjectName("placeholderOverlay")
+        self.placeholder_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.placeholder_container.setStyleSheet("""
+            QFrame#placeholderOverlay {
+                background-color: rgba(15, 15, 18, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 18px;
+                padding: 36px;
+            }
+        """)
+        placeholder_layout = QVBoxLayout(self.placeholder_container)
+        placeholder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        placeholder_layout.setSpacing(Spacing.MD)
+        
         # 标题图标
         icon_label = QLabel("📁")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("font-size: 48px;")
-        layout.addWidget(icon_label)
+        icon_label.setStyleSheet("font-size: 56px;")
+        placeholder_layout.addWidget(icon_label)
         
         # 标题文本
         title_label = QLabel("拖拽文件夹到此处")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet("""
-            color: #FFFFFF;
-            font-size: 20px;
-            font-weight: bold;
-            margin: 10px;
+            QLabel {
+                color: #FFFFFF;
+                font-size: 22px;
+                font-weight: bold;
+                padding: 14px 28px;
+                border-radius: 14px;
+                background-color: rgba(0, 0, 0, 0.5);
+            }
         """)
-        layout.addWidget(title_label)
+        placeholder_layout.addWidget(title_label)
         
         # 说明文本
-        desc_label = QLabel("支持多选文件夹，可将文件夹从文件管理器拖拽至此区域\n拖拽的文件夹将自动添加到左侧扫描路径列表")
+        desc_label = QLabel()
+        desc_label.setTextFormat(Qt.TextFormat.RichText)
+        desc_label.setText("""
+            <p style='line-height: 1.8; margin: 0;'>
+                支持多选文件夹，可将文件夹从文件管理器拖拽至此区域<br>
+                拖拽的文件夹将自动添加到左侧扫描路径列表
+            </p>
+        """)
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc_label.setStyleSheet("""
             color: #AAAAAA;
             font-size: 14px;
-            margin: 5px;
+            margin: 6px 12px 0 12px;
         """)
         desc_label.setWordWrap(True)
-        layout.addWidget(desc_label)
+        placeholder_layout.addWidget(desc_label)
+        layout.addWidget(self.placeholder_container, 1, Qt.AlignmentFlag.AlignCenter)
         
         # 统计信息区域（初始状态隐藏）
         self.stats_group = QFrame()
@@ -144,14 +168,7 @@ class DragDropArea(QFrame):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
             # 改变样式表示可以接受拖拽
-            self.setStyleSheet("""
-                DragDropArea {
-                    background-color: #333337;
-                    border: 2px dashed #FF8C00;
-                    border-radius: 10px;
-                    min-height: 200px;
-                }
-            """)
+            self.setStyleSheet(self._style_drag_active if self._has_paths else self._style_drag_empty)
         else:
             event.ignore()
             
@@ -165,56 +182,28 @@ class DragDropArea(QFrame):
     def dragLeaveEvent(self, event):
         """拖拽离开事件"""
         # 恢复原始样式
-        self.setStyleSheet("""
-            DragDropArea {
-                background-color: #2d2d30;
-                border: 2px dashed #555555;
-                border-radius: 10px;
-                min-height: 200px;
-            }
-            DragDropArea:hover {
-                border: 2px dashed #FF8C00;
-                background-color: #333337;
-            }
-        """)
+        self._apply_default_style()
         super().dragLeaveEvent(event)
             
     def dropEvent(self, event: QDropEvent):
         """拖拽释放事件"""
         if event.mimeData().hasUrls():
-            # 获取拖拽的文件路径
             urls = event.mimeData().urls()
             new_paths = []
             
             for url in urls:
                 path = url.toLocalFile()
-                # 检查是否是目录
                 if path and os.path.isdir(path) and path not in new_paths:
                     new_paths.append(path)
             
-            # 如果有新路径添加，发出信号
             if new_paths:
                 self.paths_dropped.emit(new_paths)
-                # 分析路径并显示统计信息
                 self.analyze_paths(new_paths)
-            
             event.acceptProposedAction()
         else:
             event.ignore()
-            
-        # 恢复原始样式
-        self.setStyleSheet("""
-            DragDropArea {
-                background-color: #2d2d30;
-                border: 2px dashed #555555;
-                border-radius: 10px;
-                min-height: 200px;
-            }
-            DragDropArea:hover {
-                border: 2px dashed #FF8C00;
-                background-color: #333337;
-            }
-        """)
+        
+        self._apply_default_style()
         
     def analyze_paths(self, paths):
         """分析路径并显示统计信息"""
@@ -223,8 +212,11 @@ class DragDropArea(QFrame):
         
         # 清空统计容器
         for i in reversed(range(self.stats_layout.count())):
-            widget = self.stats_layout.itemAt(i).widget()
-            if widget:
+            item = self.stats_layout.takeAt(i)
+            if not item:
+                continue
+            widget = item.widget()
+            if widget is not None:
                 widget.setParent(None)
         
         # 支持的图片格式
@@ -274,6 +266,8 @@ class DragDropArea(QFrame):
         
         # 如果有统计信息，显示统计区域
         if self.scanned_paths:
+            self._has_paths = True
+            self.placeholder_container.setVisible(False)
             self.stats_group.setVisible(True)
             
             # 更新总览统计
@@ -283,7 +277,11 @@ class DragDropArea(QFrame):
             # 添加弹性空间
             self.stats_layout.addStretch()
         else:
+            self._has_paths = False
             self.stats_group.setVisible(False)
+            self.placeholder_container.setVisible(True)
+
+        self._apply_default_style()
     
     def create_stats_card(self, path, image_count, size, formats):
         """创建单个目录的统计卡片"""
@@ -357,3 +355,48 @@ class DragDropArea(QFrame):
         # 始终调用analyze_paths，即使paths为空
         # 这样可以在清空路径时也清除统计信息
         self.analyze_paths(paths)
+
+    def _apply_default_style(self):
+        if self._has_paths:
+            self.setStyleSheet(self._style_active)
+        else:
+            self.setStyleSheet(self._style_empty)
+
+    def _build_style(self, *, empty: bool, highlight: bool) -> str:
+        border_color = "#FF8C00" if highlight else "#555555"
+        background_color = "rgba(51, 51, 55, 0.85)" if highlight else "#2d2d30"
+        background_image = ""
+        if empty and self._background_image:
+            normalized = self._background_image.replace("\\", "/")
+            background_image = f"""
+                background-image: url("{normalized}");
+                background-position: center;
+                background-repeat: no-repeat;
+                background-size: cover;
+            """
+        return f"""
+            DragDropArea {{
+                background-color: {background_color};
+                border: 2px dashed {border_color};
+                border-radius: 12px;
+                min-height: 220px;
+                {background_image}
+            }}
+            DragDropArea:hover {{
+                border: 2px dashed #FF8C00;
+                background-color: rgba(51, 51, 55, 0.85);
+            }}
+        """
+
+    def _resolve_resource(self, relative_path: str) -> str | None:
+        base_paths = [
+            Path(__file__).resolve().parents[2] / "resources",
+            Path(__file__).resolve().parents[1] / "resources",
+            Path.cwd() / "resources",
+            Path.cwd() / "app" / "resources",
+        ]
+        for base in base_paths:
+            candidate = base / relative_path
+            if candidate.exists():
+                return str(candidate)
+        return None
