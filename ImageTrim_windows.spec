@@ -6,6 +6,7 @@ Windows专用PyInstaller规格文件 - 保守配置避免DLL问题
 import sys
 import os
 
+
 # 项目配置
 main_script = "app/main.py"
 resources_path = "app/resources"
@@ -114,12 +115,18 @@ hiddenimports = [
     'idna',
 ]
 
+# 收集资源数据
+datas = []
+if os.path.isdir(resources_path):
+    datas.append((resources_path, "resources"))
+
+
 # 分析配置
 a = Analysis(
     [main_script],
     pathex=[],
     binaries=[],
-    datas=[(resources_path, "resources") if os.path.exists(resources_path) else []],
+    datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
@@ -129,19 +136,27 @@ a = Analysis(
     optimize=0,  # 保守的优化级别
 )
 
+
 # Windows特定优化：确保DLL正确加载
 if sys.platform == "win32":
     # 确保包含所有必要的DLL
-    from PyInstaller.utils.hooks import collect_data_files
     from PyInstaller.utils.hooks import collect_dynamic_libs
 
     # 收集PyQt6的DLL
     qt_libs = collect_dynamic_libs('PyQt6')
-    a.binaries.extend(qt_libs)
+    normalized_qt_libs = []
+    for src_path, dest_dir in qt_libs:
+        dest_name = os.path.join(dest_dir, os.path.basename(src_path)).replace("\\", "/")
+        normalized_qt_libs.append((dest_name, src_path, "BINARY"))
+    a.binaries.extend(normalized_qt_libs)
 
     # 收集PIL的DLL
     pil_libs = collect_dynamic_libs('PIL')
-    a.binaries.extend(pil_libs)
+    normalized_pil_libs = []
+    for src_path, dest_dir in pil_libs:
+        dest_name = os.path.join(dest_dir, os.path.basename(src_path)).replace("\\", "/")
+        normalized_pil_libs.append((dest_name, src_path, "BINARY"))
+    a.binaries.extend(normalized_pil_libs)
 
 # PYZ压缩
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)

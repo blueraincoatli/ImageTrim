@@ -8,6 +8,7 @@ import sys
 import os
 from pathlib import Path
 
+
 # 跨平台路径处理
 main_script = "app/main.py"
 resources_path = "app/resources"
@@ -173,19 +174,25 @@ hiddenimports = [
     # 'scipy.spatial.distance',  # 只如果需要距离计算
 ]
 
+
+# 收集资源数据
+datas = []
+if os.path.isdir(resources_path):
+    datas.append((resources_path, "resources"))
+
 # 分析配置 - 使用优化参数
 a = Analysis(
     [main_script],
     pathex=[],
     binaries=[],
-    datas=[(resources_path, "resources") if os.path.exists(resources_path) else []],
+    datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=excludes,
     noarchive=False,
-    optimize=2,  # 最高优化级别
+    optimize=2,
 )
 
 # 优化PYZ - 使用最高压缩级别

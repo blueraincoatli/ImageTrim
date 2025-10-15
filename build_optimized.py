@@ -133,14 +133,14 @@ def show_build_results():
 def create_comparison_report():
     """创建与之前构建的对比报告"""
     print("\nOptimization summary:")
-    print("   • Excluded matplotlib (~50MB saved)")
-    print("   • Excluded scipy (~40MB saved)")
-    print("   • Excluded pandas (~20MB saved)")
-    print("   • Excluded unused PyQt6 modules (~15MB saved)")
-    print("   • Excluded development tools (~5MB saved)")
-    print("   • Enabled UPX compression (additional 20-30% reduction)")
-    print("   • Enabled symbol stripping")
-    print("   • Used maximum Python optimization level")
+    print("   - Excluded matplotlib (~50MB saved)")
+    print("   - Excluded scipy (~40MB saved)")
+    print("   - Excluded pandas (~20MB saved)")
+    print("   - Excluded unused PyQt6 modules (~15MB saved)")
+    print("   - Excluded development tools (~5MB saved)")
+    print("   - Enabled UPX compression (additional 20-30% reduction)")
+    print("   - Enabled symbol stripping")
+    print("   - Used maximum Python optimization level")
 
 def main():
     print(f"{PROJECT_NAME} Optimized Build Tool")
