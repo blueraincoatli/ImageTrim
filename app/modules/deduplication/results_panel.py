@@ -1367,7 +1367,7 @@ class DeduplicationResultsPanel(QWidget):
         self.log_btn.setChecked(False)
         self.log_btn.setText("📋 日志")
 
-        self._show_placeholder("\u62d6\u62fd\u6587\u4ef6\u5939\u5230\u5de6\u4fa7\u533a\u57df\uff0c\u6216\u5728\u5de6\u4fa7\u6dfb\u52a0\u626b\u63cf\u8def\u5f84\u4ee5\u5f00\u59cb\u65b0\u7684\u626b\u63cf\u3002")
+        self._show_placeholder("\u626b\u63cf\u56fe\u7247\u6570\u91cf\u5927\u4e8e1000\u5f20\u65f6\uff0c\u5c06\u4f1a\u5927\u5927\u589e\u52a0\u626b\u63cf\u65f6\u95f4\uff0c\u8bf7\u8010\u5fc3\u7b49\u5f85\uff0c\u53bb\u559d\u70b9\u6c34\u8d70\u4e00\u8d70")
 
     def _clear_results_grid(self):
         """移除结果网格中的所有控件"""
@@ -1402,12 +1402,13 @@ class DeduplicationResultsPanel(QWidget):
             )
         self._placeholder_label.setText(message)
         if self._placeholder_label.parent() is None:
+            # 确保占位标签跨越所有列，在扫描结果区域内居中
             self.grid_layout.addWidget(
                 self._placeholder_label,
                 0,
                 0,
                 1,
-                1,
+                self.grid_layout.columnCount() if self.grid_layout.columnCount() > 0 else 1,
                 Qt.AlignmentFlag.AlignCenter,
             )
         self._placeholder_label.show()
