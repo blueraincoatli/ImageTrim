@@ -1,4 +1,4 @@
-name: Build with Nuitka (Multi-Platform)
+name: Build Multi-Platform (Nuitka + PyInstaller)
 
 on:
   push:
@@ -57,7 +57,12 @@ jobs:
       run: |
         uv pip install --upgrade pip
         uv pip install -r requirements.txt
-        uv pip install nuitka ordered-set zstandard imageio
+        # Nuitka for Windows/Linux, PyInstaller for macOS (Nuitka doesn't support PyQt6 on macOS)
+        if [ "${{ matrix.platform }}" = "macos" ]; then
+          uv pip install pyinstaller
+        else
+          uv pip install nuitka ordered-set zstandard imageio
+        fi
 
     - name: Install system dependencies (Linux)
       if: matrix.platform == 'linux'
@@ -144,28 +149,38 @@ jobs:
           --output-filename=ImageTrim \
           app/main.py
 
-    - name: Build with Nuitka (macOS)
+    - name: Build with PyInstaller (macOS)
       if: matrix.platform == 'macos'
       shell: bash
       run: |
-        echo "Building with Nuitka on macOS..."
-        .venv/bin/python -m nuitka \
-          --standalone \
+        echo "Building with PyInstaller on macOS (Nuitka doesn't support PyQt6 on macOS)..."
+        # 使用 PyInstaller 构建 macOS 应用
+        .venv/bin/python -m PyInstaller \
+          --name=ImageTrim \
+          --windowed \
           --onefile \
-          --assume-yes-for-downloads \
-          --enable-plugin=pyqt6 \
-          --include-package=pillow_avif \
-          --include-module=pillow_avif._avif \
-          --include-package=send2trash \
-          --include-data-dir=app/resources/icons=resources/icons \
-          --include-data-dir=app/resources/images=resources/images \
-          --macos-create-app-bundle \
-          --macos-app-icon=app/resources/icons/imageTrim256px.ico \
-          --lto=yes \
-          --remove-output \
-          --output-dir=dist_nuitka \
-          --output-filename=ImageTrim \
+          --icon=app/resources/icons/imageTrim256px.ico \
+          --add-data="app/resources/icons:resources/icons" \
+          --add-data="app/resources/images:resources/images" \
+          --hidden-import=pillow_avif \
+          --hidden-import=pillow_avif._avif \
+          --hidden-import=send2trash \
+          --collect-all=pillow_avif \
+          --noconfirm \
+          --clean \
           app/main.py
+
+        # 创建 dist_nuitka 目录以保持一致性
+        mkdir -p dist_nuitka
+
+        # 复制生成的 .app 到 dist_nuitka
+        if [ -d "dist/ImageTrim.app" ]; then
+          cp -r dist/ImageTrim.app dist_nuitka/
+          echo "macOS app bundle created successfully"
+        else
+          echo "Error: ImageTrim.app not found"
+          exit 1
+        fi
 
     - name: Create Linux packages
       if: matrix.platform == 'linux'
@@ -327,15 +342,15 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        name: ImageTrim ${{ github.ref_name }} - Nuitka 编译版本
+        name: ImageTrim ${{ github.ref_name }} - 混合编译版本
         body: |
-          ## ImageTrim ${{ github.ref_name }} - Nuitka 原生编译版本
+          ## ImageTrim ${{ github.ref_name }} - 混合编译版本
 
-          ### 🚀 重大改进
-          - **原生编译**: 使用 Nuitka 编译为原生机器码，性能更优
-          - **启动更快**: 相比 PyInstaller 版本启动速度提升 2-3 倍
-          - **体积优化**: 文件体积进一步优化
-          - **更稳定**: 原生编译减少运行时错误
+          ### 🚀 重大改进：混合编译策略
+          - **Windows/Linux**: 使用 **Nuitka** 原生编译，启动速度提升 2-3 倍 ⚡
+          - **macOS**: 使用 **PyInstaller** 编译（Nuitka 不支持 PyQt6 on macOS）
+          - **原生性能**: Windows/Linux 版本编译为原生机器码，性能更优
+          - **完全兼容**: 所有平台都能正常运行，功能完整
 
           ### 📦 下载文件
 
@@ -369,16 +384,15 @@ jobs:
 
           ### ⚡ 性能对比
 
-          | 指标 | PyInstaller | Nuitka | 改进 |
-          |------|-------------|--------|------|
-          | 启动速度 | ~3-5秒 | ~1-2秒 | **2-3x 更快** |
-          | 运行性能 | 解释执行 | 原生机器码 | **更优** |
-          | 内存占用 | 较高 | 较低 | **优化** |
-          | 稳定性 | 良好 | 更好 | **提升** |
+          | 平台 | 编译器 | 启动速度 | 性能 |
+          |------|--------|----------|------|
+          | **Windows** | Nuitka | ~1-2秒 | 原生机器码 ⚡ |
+          | **Linux** | Nuitka | ~1-2秒 | 原生机器码 ⚡ |
+          | **macOS** | PyInstaller | ~3-5秒 | 解释执行 |
 
           ### 💡 技术细节
-          - **编译器**: Nuitka (Python → C → 机器码)
-          - **优化级别**: LTO (链接时优化)
+          - **Windows/Linux**: Nuitka (Python → C → 机器码) + LTO 优化
+          - **macOS**: PyInstaller (Nuitka 不支持 PyQt6 on macOS)
           - **包含模块**: PyQt6, Pillow, pillow-avif-plugin, send2trash
           - **资源文件**: 完整包含图标和图片资源
 
