@@ -79,7 +79,8 @@ class ClickablePathLabel(QLabel):
             
             if not os.path.exists(normalized_path):
                 print(f"文件不存在: {normalized_path}")
-                QMessageBox.warning(None, "文件不存在", f"指定的文件不存在:\n{normalized_path}")
+                from app.utils.ui_helpers import UIHelpers
+                UIHelpers.show_styled_message(None, "文件不存在", f"指定的文件不存在:\n{normalized_path}", "warning", ["OK"])
                 return
                 
             system = platform.system()
@@ -108,7 +109,8 @@ class ClickablePathLabel(QLabel):
                 success = result.returncode == 0
                 if not success:
                     print(f"macOS命令执行失败: {result.stderr}")
-                    QMessageBox.warning(None, "打开失败", f"无法在Finder中打开文件位置:\n{normalized_path}\n错误: {result.stderr}")
+                    from app.utils.ui_helpers import UIHelpers
+                    UIHelpers.show_styled_message(None, "打开失败", f"无法在Finder中打开文件位置:\n{normalized_path}\n错误: {result.stderr}", "warning", ["OK"])
             else:  # Linux和其他Unix-like系统
                 # Linux: 打开文件所在文件夹（大多数文件管理器不支持直接选中文件）
                 folder = os.path.dirname(normalized_path)
@@ -117,12 +119,13 @@ class ClickablePathLabel(QLabel):
                 success = result.returncode == 0
                 if not success:
                     print(f"Linux命令执行失败: {result.stderr}")
-                    QMessageBox.warning(None, "打开失败", f"无法在文件管理器中打开文件夹:\n{folder}\n错误: {result.stderr}")
-                
+                    from app.utils.ui_helpers import UIHelpers
+                    UIHelpers.show_styled_message(None, "打开失败", f"无法在文件管理器中打开文件夹:\n{folder}\n错误: {result.stderr}", "warning", ["OK"])
+
         except Exception as e:
             print(f"打开文件位置失败: {e}")
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.critical(None, "错误", f"打开文件位置时发生错误:\n{str(e)}")
+            from app.utils.ui_helpers import UIHelpers
+            UIHelpers.show_styled_message(None, "错误", f"打开文件位置时发生错误:\n{str(e)}", "error", ["OK"])
 
 
 class ImagePathTooltip(QFrame):
@@ -228,6 +231,21 @@ class DuplicateImageWidget(QFrame):
         self.init_ui()
 
     def init_ui(self):
+        # 设置 DuplicateImageWidget 本身的样式（需要有背景才能显示阴影）
+        self.setStyleSheet("""
+            QFrame {
+                background-color: transparent;
+                border: none;
+            }
+        """)
+
+        # 将阴影应用到整个 DuplicateImageWidget 上
+        self._shadow_effect = QGraphicsDropShadowEffect(self)
+        self._shadow_effect.setBlurRadius(20)  # 增大模糊半径
+        self._shadow_effect.setOffset(4, 4)     # 右下方向偏移
+        self._shadow_effect.setColor(QColor(0, 0, 0, 180))  # 深色阴影
+        self.setGraphicsEffect(self._shadow_effect)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -245,11 +263,6 @@ class DuplicateImageWidget(QFrame):
             }
         """)
 
-        self._shadow_effect = QGraphicsDropShadowEffect(self.image_label)
-        self._shadow_effect.setBlurRadius(18)
-        self._shadow_effect.setOffset(0, 4)
-        self._shadow_effect.setColor(QColor(0, 0, 0, 140))
-        self.image_label.setGraphicsEffect(self._shadow_effect)
         layout.addWidget(self.image_label)
 
         try:
@@ -263,6 +276,21 @@ class DuplicateImageWidget(QFrame):
         except Exception as exc:  # pylint: disable=broad-except
             print(f"图片缓存加载失败: {exc}")
             self._create_image_label_fallback(self.image_label)
+
+    def _reapply_shadow(self):
+        """重新应用阴影效果（在 setStyleSheet 后需要调用）"""
+        # 检查是否已有阴影效果
+        existing_effect = self.graphicsEffect()
+        if existing_effect is not None:
+            # 已有阴影，无需重新创建
+            return
+
+        # 创建并应用新的阴影效果到整个 widget
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setOffset(4, 4)
+        shadow.setColor(QColor(0, 0, 0, 180))
+        self.setGraphicsEffect(shadow)
 
     def _apply_placeholder(self, label: QLabel):
         label.clear()
@@ -278,6 +306,8 @@ class DuplicateImageWidget(QFrame):
                 margin: 0px;
             }
         """)
+        # 重新应用阴影效果（setStyleSheet 会清除 QGraphicsEffect）
+        self._reapply_shadow()
 
     def _apply_pixmap(self, pixmap: QPixmap):
         if not pixmap or pixmap.isNull():
@@ -286,7 +316,7 @@ class DuplicateImageWidget(QFrame):
 
         # 确保image_label的尺寸正确设置
         self.image_label.setFixedSize(self.thumbnail_width, self.thumbnail_height)
-        
+
         # 使用KeepAspectRatioByExpanding确保图片填满整个区域
         scaled = pixmap.scaled(
             self.thumbnail_width,
@@ -294,22 +324,25 @@ class DuplicateImageWidget(QFrame):
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation,
         )
-        
+
         # 计算居中显示的矩形区域
         pixmap_rect = scaled.rect()
         label_rect = QRect(0, 0, self.thumbnail_width, self.thumbnail_height)
-        
+
         # 如果图片比例与标签比例不匹配，居中裁剪
         if pixmap_rect.width() > label_rect.width() or pixmap_rect.height() > label_rect.height():
             x = max(0, (pixmap_rect.width() - label_rect.width()) // 2)
             y = max(0, (pixmap_rect.height() - label_rect.height()) // 2)
             crop_rect = QRect(x, y, label_rect.width(), label_rect.height())
             scaled = scaled.copy(crop_rect)
-        
+
         self.image_label.setPixmap(scaled)
         self.image_label.setText("")
         self.image_label.update()
         self.image_label.updateGeometry()
+
+        # 确保阴影效果存在（图片加载后可能需要重新应用）
+        self._reapply_shadow()
 
     def _request_thumbnail(self):
         if not self._image_cache:
@@ -366,10 +399,14 @@ class DuplicateImageWidget(QFrame):
             qimage = QImage(data, thumbnail.width, thumbnail.height, QImage.Format.Format_RGBA8888)
             pixmap = QPixmap.fromImage(qimage)
             label.setPixmap(pixmap)
+            # 重新应用阴影效果
+            self._reapply_shadow()
         except Exception as exc:  # pylint: disable=broad-except
             label.setText("🚫")
             label.setStyleSheet("color: #dc3545; font-size: 24px; background-color: transparent; border: none;")
             print(f"直接加载缩略图失败: {exc}")
+            # 即使加载失败也要保持阴影
+            self._reapply_shadow()
 
     def _on_thumbnail_ready(self, file_path: str, width: int, height: int, pixmap: QPixmap):
         if file_path != self.file_path:
@@ -537,6 +574,15 @@ class DuplicateGroupWidget(QFrame):
 
     def init_ui(self):
         self.setStyleSheet(self._BASE_STYLE)
+
+        # 添加阴影效果 - 使用项目主题
+        from app.ui.theme import Shadow
+        shadow = QGraphicsDropShadowEffect()
+        blur_radius, color_rgba, offset_x, offset_y = Shadow.card_shadow()
+        shadow.setBlurRadius(blur_radius)
+        shadow.setOffset(offset_x, offset_y)
+        shadow.setColor(QColor(color_rgba))
+        self.setGraphicsEffect(shadow)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -1330,9 +1376,10 @@ class DeduplicationResultsPanel(QWidget):
             import os
             
             if not os.path.exists(file_path):
-                QMessageBox.warning(self, "文件不存在", f"文件不存在: {file_path}")
+                from app.utils.ui_helpers import UIHelpers
+                UIHelpers.show_styled_message(self, "文件不存在", f"文件不存在: {file_path}", "warning", ["OK"])
                 return
-                
+
             system = platform.system()
             if system == "Windows":
                 os.startfile(file_path)
@@ -1342,7 +1389,8 @@ class DeduplicationResultsPanel(QWidget):
                 subprocess.run(["xdg-open", file_path])
         except Exception as e:
             print(f"打开图片时出错: {e}")
-            QMessageBox.critical(self, "错误", f"无法打开图片: {str(e)}")
+            from app.utils.ui_helpers import UIHelpers
+            UIHelpers.show_styled_message(self, "错误", f"无法打开图片: {str(e)}", "error", ["OK"])
         
     def update_selection_count(self):
         count = len(self.selected_files)
@@ -1464,16 +1512,15 @@ class DeduplicationResultsPanel(QWidget):
         if not self.selected_files:
             return
 
-        # 确认对话框
-        reply = QMessageBox.question(
+        # 确认对话框 - 使用统一样式
+        from app.utils.ui_helpers import UIHelpers
+        result = UIHelpers.show_confirmation(
             self,
             "确认删除",
-            f"确定要删除选中的 {len(self.selected_files)} 个重复文件吗？此操作不可撤销！",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            f"确定要删除选中的 {len(self.selected_files)} 个重复文件吗？\n\n此操作不可撤销！"
         )
 
-        if reply == QMessageBox.StandardButton.Yes:
+        if result:
             success_count = 0
             failed_files = []
             total_space_saved = 0
@@ -1756,19 +1803,23 @@ class DeduplicationResultsPanel(QWidget):
         except Exception as e:
             print(f"显示统计弹窗时出错: {e}")
             # 如果统计弹窗出错，使用简单的消息框代替
-            from PyQt6.QtWidgets import QMessageBox
+            from app.utils.ui_helpers import UIHelpers
             space_mb = space_saved / (1024 * 1024)
             if operation_type == 'delete':
-                QMessageBox.information(
+                UIHelpers.show_styled_message(
                     self,
                     "清理完成",
-                    f"删除了{processed_count}幅重复图片，总共节省了{space_mb:.1f}MB的空间！"
+                    f"删除了{processed_count}幅重复图片，总共节省了{space_mb:.1f}MB的空间！",
+                    "success",
+                    ["OK"]
                 )
             elif operation_type == 'move':
-                QMessageBox.information(
+                UIHelpers.show_styled_message(
                     self,
                     "移动完成",
-                    f"移动了{processed_count}幅重复图片，文件夹现在更有条理了。"
+                    f"移动了{processed_count}幅重复图片，文件夹现在更有条理了。",
+                    "success",
+                    ["OK"]
                 )
 
     def handle_stats_action(self, action):
