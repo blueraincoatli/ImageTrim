@@ -4,6 +4,7 @@
 """
 
 import os
+import sys
 from pathlib import Path
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                              QFrame, QFileDialog, QListWidget, QAbstractItemView,
@@ -387,14 +388,6 @@ class DragDropArea(QFrame):
         """
 
     def _resolve_resource(self, relative_path: str) -> str | None:
-        base_paths = [
-            Path(__file__).resolve().parents[2] / "resources",
-            Path(__file__).resolve().parents[1] / "resources",
-            Path.cwd() / "resources",
-            Path.cwd() / "app" / "resources",
-        ]
-        for base in base_paths:
-            candidate = base / relative_path
-            if candidate.exists():
-                return str(candidate)
-        return None
+        """解析资源文件路径，支持 PyInstaller 和 Nuitka"""
+        from app.utils.resource_path import get_resource_path
+        return get_resource_path(relative_path)

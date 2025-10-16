@@ -233,28 +233,8 @@ class StartupDialog(QDialog):
         QTimer.singleShot(500, self.accept)
 
     def get_resource_path(self, relative_path):
-        """获取资源文件的绝对路径，支持PyInstaller打包环境"""
-        try:
-            # PyInstaller创建临时文件夹，将路径存储在_MEIPASS中
-            base_path = sys._MEIPASS
-        except Exception:
-            # 开发环境
-            base_path = os.path.abspath(".")
-
-        # 尝试多个可能的路径
-        possible_paths = [
-            os.path.join(base_path, relative_path),
-            os.path.join(base_path, "resources", relative_path),
-            os.path.join(base_path, "app", "resources", relative_path),
-            os.path.join(".", "app", "resources", relative_path),
-            os.path.join(".", "resources", relative_path),
-            os.path.join(".", relative_path)
-        ]
-
-        for path in possible_paths:
-            if os.path.exists(path):
-                return path
-
-        return None
+        """获取资源文件的绝对路径，支持 PyInstaller 和 Nuitka 打包环境"""
+        from app.utils.resource_path import get_resource_path as get_res_path
+        return get_res_path(relative_path)
 
   

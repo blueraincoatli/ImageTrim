@@ -33,6 +33,7 @@ class FunctionManager(QObject):
         self.module_constructors: Dict[str, Callable[[], BaseFunctionModule]] = {}
         self.module_infos: Dict[str, ModuleInfo] = {}
         self.active_module: Optional[BaseFunctionModule] = None
+        self._module_order: List[str] = []
 
     def register_module(self, module: BaseFunctionModule) -> bool:
         """
@@ -47,6 +48,8 @@ class FunctionManager(QObject):
         if module.name in self.modules:
             return False
         self.modules[module.name] = module
+        if module.name not in self._module_order:
+            self._module_order.append(module.name)
         return True
 
     def register_module_constructor(self, name: str, constructor: Callable[[], BaseFunctionModule], display_name: str = None) -> bool:
@@ -81,6 +84,8 @@ class FunctionManager(QObject):
         
         # 保存构造函数
         self.module_constructors[name] = constructor
+        if name not in self._module_order:
+            self._module_order.append(name)
         return True
 
     def unregister_module(self, name: str) -> bool:
@@ -95,6 +100,8 @@ class FunctionManager(QObject):
         """
         if name in self.modules:
             del self.modules[name]
+            if name in self._module_order:
+                self._module_order.remove(name)
             return True
         return False
 
@@ -148,7 +155,14 @@ class FunctionManager(QObject):
         """
         all_names = set(self.modules.keys())
         all_names.update(self.module_constructors.keys())
-        return list(all_names)
+        ordered = []
+        for name in self._module_order:
+            if name in all_names:
+                ordered.append(name)
+        for name in all_names:
+            if name not in ordered:
+                ordered.append(name)
+        return ordered
 
     def get_module(self, name: str) -> Optional[BaseFunctionModule]:
         """

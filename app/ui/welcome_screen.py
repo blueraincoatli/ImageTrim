@@ -237,12 +237,20 @@ class WelcomeScreen(QWidget):
 
     def load_local_image(self, show_failure_message: bool = True) -> bool:
         """加载本地兜底图片"""
-        image_paths = [
-            Path(__file__).parent.parent / "resources" / "images" / "placeholder.jpg",
-            Path(__file__).parent.parent / "resources" / "icons" / "imagetrim.ico",
+        from app.utils.resource_path import get_resource_path
+
+        # 尝试加载的资源文件列表
+        resource_paths = [
+            "images/placeholder.jpg",
+            "icons/imagetrim.ico",
         ]
 
-        for path in image_paths:
+        for relative_path in resource_paths:
+            path_str = get_resource_path(relative_path)
+            if not path_str:
+                continue
+
+            path = Path(path_str)
             if not path.exists():
                 continue
 

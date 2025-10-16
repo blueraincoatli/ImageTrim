@@ -204,47 +204,6 @@ class AboutDialog(QDialog):
         """)
 
     def get_resource_path(self, relative_path):
-        """获取资源文件的绝对路径，支持PyInstaller打包环境"""
-        try:
-            # PyInstaller创建临时文件夹，将路径存储在_MEIPASS中
-            base_path = sys._MEIPASS
-            print(f"PyInstaller环境 - MEIPASS: {base_path}")
-        except Exception:
-            # 开发环境
-            base_path = os.path.abspath(".")
-            print(f"开发环境 - 基础路径: {base_path}")
-
-        # 根据PyInstaller的datas配置调整路径查找顺序
-        # spec中配置: datas=[('app\\resources', 'resources')]
-        # 这意味着app/resources会被映射到resources/
-        possible_paths = []
-
-        if getattr(sys, 'frozen', False):
-            # PyInstaller打包环境 - resources直接在根目录
-            possible_paths = [
-                os.path.join(base_path, "resources", relative_path),  # 主要路径
-                os.path.join(base_path, relative_path),                # 备用路径
-            ]
-            print("使用PyInstaller路径查找策略")
-        else:
-            # 开发环境
-            possible_paths = [
-                os.path.join("app", "resources", relative_path),      # 开发环境主要路径
-                os.path.join(base_path, "app", "resources", relative_path),
-                os.path.join(base_path, "resources", relative_path),
-                os.path.join(base_path, relative_path),
-            ]
-            print("使用开发环境路径查找策略")
-
-        print(f"查找的相对路径: {relative_path}")
-        print("尝试的路径:")
-        for i, path in enumerate(possible_paths):
-            print(f"  {i+1}. {path}")
-            if os.path.exists(path):
-                print(f"      ✅ 找到文件!")
-                return path
-            else:
-                print(f"      ❌ 不存在")
-
-        print(f"❌ 所有路径都未找到文件: {relative_path}")
-        return None
+        """获取资源文件的绝对路径，支持 PyInstaller 和 Nuitka 打包环境"""
+        from app.utils.resource_path import get_resource_path as get_res_path
+        return get_res_path(relative_path)
