@@ -568,9 +568,21 @@ class DeduplicationModule(BaseFunctionModule):
         
         # 发送结果到工作区
         self.execution_finished.emit(result_data)
-        
-        # 如果没有找到重复图片，切换回拖拽区域
+
+        # 如果没有找到重复图片，显示提示并切换回拖拽区域
         if not result_data.get('duplicates'):
+            # 显示友好的提示对话框
+            from app.utils.ui_helpers import UIHelpers
+
+            UIHelpers.show_styled_message(
+                None,
+                "扫描完成",
+                "太好了，很干净！\n\n没有发现重复图片，你的相册已经很整洁了。",
+                "success",
+                ["OK"]
+            )
+
+            # 切换回拖拽区域
             if hasattr(self, "workspace_stacked_widget"):
                 self.workspace_stacked_widget.setCurrentIndex(0)
             

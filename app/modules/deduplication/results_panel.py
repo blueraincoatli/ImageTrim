@@ -1015,12 +1015,26 @@ class DeduplicationResultsPanel(QWidget):
             }
         """)
         
-        self.scroll_widget = QWidget()
+        # 创建自定义的 scroll_widget 以处理 resize 事件
+        class ScrollWidget(QWidget):
+            def __init__(self, parent_panel):
+                super().__init__()
+                self.parent_panel = parent_panel
+
+            def resizeEvent(self, event):
+                super().resizeEvent(event)
+                # 当 scroll_widget 大小改变时，更新占位标签的位置
+                if hasattr(self.parent_panel, '_placeholder_label') and \
+                   self.parent_panel._placeholder_label and \
+                   self.parent_panel._placeholder_label.isVisible():
+                    self.parent_panel._placeholder_label.setGeometry(self.rect())
+
+        self.scroll_widget = ScrollWidget(self)
         self.scroll_widget.setStyleSheet("background-color: #1e1e1e;")
         self.grid_layout = QGridLayout(self.scroll_widget)
         self.grid_layout.setSpacing(Spacing.SM)  # 设置网格间距
         self.grid_layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)  # 设置网格边距
-        
+
         self.scroll_area.setWidget(self.scroll_widget)
         
         # 日志区域（默认隐藏）
@@ -1135,6 +1149,13 @@ class DeduplicationResultsPanel(QWidget):
                 border-color: #3A3A3A;
             }}
             """
+
+    def resizeEvent(self, event):
+        """处理窗口大小改变事件"""
+        super().resizeEvent(event)
+        # 更新占位标签的大小
+        if self._placeholder_label and self._placeholder_label.isVisible():
+            self._placeholder_label.setGeometry(self.scroll_widget.rect())
 
     def eventFilter(self, source, event):
         if source is self.scroll_area.viewport():
@@ -1367,7 +1388,7 @@ class DeduplicationResultsPanel(QWidget):
         self.log_btn.setChecked(False)
         self.log_btn.setText("📋 日志")
 
-        self._show_placeholder("\u626b\u63cf\u56fe\u7247\u6570\u91cf\u5927\u4e8e1000\u5f20\u65f6\uff0c\u5c06\u4f1a\u5927\u5927\u589e\u52a0\u626b\u63cf\u65f6\u95f4\uff0c\u8bf7\u8010\u5fc3\u7b49\u5f85\uff0c\u53bb\u559d\u70b9\u6c34\u8d70\u4e00\u8d70")
+        self._show_placeholder("正在扫描图片...\n\n如果图片数量较多（超过1000张），\n扫描可能需要一些时间，请耐心等待")
 
     def _clear_results_grid(self):
         """移除结果网格中的所有控件"""
@@ -1394,54 +1415,77 @@ class DeduplicationResultsPanel(QWidget):
 
     def _show_placeholder(self, message: str):
         if not self._placeholder_label:
-            self._placeholder_label = QLabel()
+            self._placeholder_label = QLabel(self.scroll_widget)
             self._placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._placeholder_label.setWordWrap(True)
+            # 设置样式，确保占据整个可用空间并居中显示
             self._placeholder_label.setStyleSheet(
-                "color: white; font-size: 16px; font-weight: bold; padding: 48px;"
+                """
+                QLabel {
+                    color: white;
+                    font-size: 16px;
+                    font-weight: normal;
+                    padding: 48px;
+                    background-color: transparent;
+                }
+                """
             )
+            # 设置尺寸策略，让 label 扩展以填充可用空间
+            from PyQt6.QtWidgets import QSizePolicy
+            self._placeholder_label.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Expanding
+            )
+
         self._placeholder_label.setText(message)
-        if self._placeholder_label.parent() is None:
-            # 确保占位标签跨越所有列，在扫描结果区域内居中
-            self.grid_layout.addWidget(
-                self._placeholder_label,
-                0,
-                0,
-                1,
-                self.grid_layout.columnCount() if self.grid_layout.columnCount() > 0 else 1,
-                Qt.AlignmentFlag.AlignCenter,
-            )
         self._placeholder_label.show()
+        self._placeholder_label.raise_()  # 确保在最上层
+
+        # 立即更新一次位置
+        self._placeholder_label.setGeometry(self.scroll_widget.rect())
+
+        # 延迟更新位置，确保窗口完全显示后再次调整
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(50, self._update_placeholder_geometry)
+        QTimer.singleShot(150, self._update_placeholder_geometry)
+
+    def _update_placeholder_geometry(self):
+        """更新占位标签的几何形状"""
+        if self._placeholder_label and self._placeholder_label.isVisible():
+            self._placeholder_label.setGeometry(self.scroll_widget.rect())
 
     def _hide_placeholder(self):
         if not self._placeholder_label:
             return
-        if self._placeholder_label.parent() is not None:
-            self.grid_layout.removeWidget(self._placeholder_label)
         self._placeholder_label.hide()
 
     def delete_selected(self):
         """删除选中文件 - 按重复组仅保留第一张，其余文件执行删除"""
         if not self.selected_files:
             return
-            
+
         # 确认对话框
         reply = QMessageBox.question(
-            self, 
-            "确认删除", 
+            self,
+            "确认删除",
             f"确定要删除选中的 {len(self.selected_files)} 个重复文件吗？此操作不可撤销！",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
-        
+
         if reply == QMessageBox.StandardButton.Yes:
             success_count = 0
             failed_files = []
-            
-            # 删除文件
+            total_space_saved = 0
+
+            # 删除文件并计算节省空间
             for file_path in self.selected_files:
                 try:
                     if os.path.exists(file_path):
+                        # 获取文件大小
+                        file_size = os.path.getsize(file_path)
+                        total_space_saved += file_size
+
                         os.remove(file_path)
                         success_count += 1
                         if self.module:
@@ -1454,17 +1498,16 @@ class DeduplicationResultsPanel(QWidget):
                     failed_files.append(file_path)
                     if self.module:
                         self.module.log_message.emit(f"删除失败 {file_path}: {str(e)}", "error")
-                    
-            # 显示结果
-            message = f"成功删除 {success_count} 个文件"
-            if failed_files:
-                message += f"，失败 {len(failed_files)} 个文件"
-                
-            QMessageBox.information(self, "删除完成", message)
-            
+
+            # 原有的删除完成弹窗已移除，避免与统计弹窗重复
+
+            # 显示统计弹窗
+            if success_count > 0:
+                self.show_completion_stats('delete', success_count, total_space_saved)
+
             # 从UI中移除已删除的文件
             self._remove_deleted_files_from_ui()
-            
+
             # 清空选中
             self.selected_files.clear()
             self.update_selection_count()
@@ -1475,15 +1518,15 @@ class DeduplicationResultsPanel(QWidget):
         """移动选中文件 - 按重复组仅保留第一张，其余文件执行移动"""
         if not self.selected_files:
             return
-            
+
         # 选择目标目录
         target_dir = QFileDialog.getExistingDirectory(self, "选择目标目录")
         if not target_dir:
             return
-            
+
         success_count = 0
         failed_files = []
-        
+
         # 移动文件
         for file_path in self.selected_files:
             try:
@@ -1491,7 +1534,7 @@ class DeduplicationResultsPanel(QWidget):
                     # 生成目标文件路径
                     filename = os.path.basename(file_path)
                     target_path = os.path.join(target_dir, filename)
-                    
+
                     # 如果目标文件已存在，添加序号
                     counter = 1
                     original_target_path = target_path
@@ -1499,7 +1542,7 @@ class DeduplicationResultsPanel(QWidget):
                         name, ext = os.path.splitext(original_target_path)
                         target_path = f"{name}_{counter}{ext}"
                         counter += 1
-                    
+
                     shutil.move(file_path, target_path)
                     success_count += 1
                     if self.module:
@@ -1512,17 +1555,16 @@ class DeduplicationResultsPanel(QWidget):
                 failed_files.append(file_path)
                 if self.module:
                     self.module.log_message.emit(f"移动失败 {file_path}: {str(e)}", "error")
-                
-        # 显示结果
-        message = f"成功移动 {success_count} 个文件"
-        if failed_files:
-            message += f"，失败 {len(failed_files)} 个文件"
-            
-        QMessageBox.information(self, "移动完成", message)
-        
+
+        # 原有的移动完成弹窗已移除，避免与统计弹窗重复
+
+        # 显示统计弹窗
+        if success_count > 0:
+            self.show_completion_stats('move', success_count, 0)
+
         # 从UI中移除已移动的文件
         self._remove_deleted_files_from_ui()
-        
+
         # 清空选中
         self.selected_files.clear()
         self.update_selection_count()
@@ -1691,7 +1733,62 @@ class DeduplicationResultsPanel(QWidget):
             group_widget.update_thumbnails(column_width)
             # 刷新缩略图显示
             group_widget.refresh_thumbnails()
-            
+
             # 强制更新布局以确保正确显示
             group_widget.updateGeometry()
             group_widget.update()
+
+    def show_completion_stats(self, operation_type, processed_count, space_saved):
+        """显示完成统计弹窗"""
+        try:
+            from app.ui.stats_dialog import StatsDialog
+
+            # 创建统计弹窗
+            dialog = StatsDialog(self)
+            dialog.show_deduplication_operation_results(operation_type, processed_count, space_saved)
+
+            # 连接信号处理
+            dialog.action_requested.connect(self.handle_stats_action)
+
+            # 显示弹窗
+            dialog.exec()
+
+        except Exception as e:
+            print(f"显示统计弹窗时出错: {e}")
+            # 如果统计弹窗出错，使用简单的消息框代替
+            from PyQt6.QtWidgets import QMessageBox
+            space_mb = space_saved / (1024 * 1024)
+            if operation_type == 'delete':
+                QMessageBox.information(
+                    self,
+                    "清理完成",
+                    f"删除了{processed_count}幅重复图片，总共节省了{space_mb:.1f}MB的空间！"
+                )
+            elif operation_type == 'move':
+                QMessageBox.information(
+                    self,
+                    "移动完成",
+                    f"移动了{processed_count}幅重复图片，文件夹现在更有条理了。"
+                )
+
+    def handle_stats_action(self, action):
+        """处理统计弹窗的动作请求"""
+        if action == "view_results":
+            # 查看结果 - 确保结果面板可见
+            if self.parent() and hasattr(self.parent(), 'setCurrentIndex'):
+                # 如果是堆叠窗口，确保显示结果面板
+                self.parent().setCurrentIndex(1)
+        elif action == "view_details":
+            # 查看详情 - 可以扩展功能
+            pass
+
+    def _format_size(self, size_bytes):
+        """格式化文件大小"""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
