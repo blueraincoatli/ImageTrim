@@ -1,9 +1,10 @@
-name: Build Multi-Platform
+name: Build Multi-Platform (DEPRECATED - Use build-nuitka.yml)
 
 on:
-  push:
-    tags:
-      - 'v*'
+  # 已禁用自动触发，改用 Nuitka 工作流
+  # push:
+  #   tags:
+  #     - 'v*'
   workflow_dispatch:
     inputs:
       version:
