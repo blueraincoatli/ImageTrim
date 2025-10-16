@@ -3,6 +3,7 @@
 AVIF转换模块
 """
 
+import os
 import threading
 from app.core.base_module import BaseFunctionModule
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QTextEdit, QFileDialog, QLineEdit, QCheckBox, QSpinBox, QGroupBox, QComboBox
@@ -408,6 +409,9 @@ class AVIFConverterModule(BaseFunctionModule):
         """
         处理执行完成事件
         """
+        # 保存结果数据（用于删除原图功能）
+        self._last_result_data = result_data
+
         self.is_converting = False
         self.convert_stop_btn.setText("🔄 开始转换")
         self.convert_stop_btn.setStyleSheet("""
@@ -436,3 +440,177 @@ class AVIFConverterModule(BaseFunctionModule):
         # 如果工作区UI存在，更新其统计信息
         if self.workspace_ui:
             self.workspace_ui.on_execution_finished(result_data)
+
+        # 显示转换完成统计弹窗
+        self.show_conversion_stats(result_data)
+
+    def show_conversion_stats(self, result_data):
+        """显示转换完成统计弹窗"""
+        try:
+            success_count = result_data.get('success_count', 0)
+            if success_count > 0:  # 只在有成功转换时显示统计弹窗
+                from app.ui.stats_dialog import StatsDialog
+                from PyQt6.QtWidgets import QApplication
+
+                # 获取父窗口 - 尝试从工作区UI获取
+                parent_widget = None
+                if self.workspace_ui and hasattr(self.workspace_ui, 'window'):
+                    # 确保workspace_ui是一个有效的QWidget
+                    parent_widget = self.workspace_ui.window() if hasattr(self.workspace_ui, 'window') else self.workspace_ui
+                else:
+                    # 如果没有有效的工作区UI，尝试从主窗口获取
+                    try:
+                        # 查找当前活动的主窗口
+                        for widget in QApplication.topLevelWidgets():
+                            if widget.isWindow() and widget.isVisible():
+                                parent_widget = widget
+                                break
+                    except:
+                        pass
+
+                # 创建统计弹窗
+                dialog = StatsDialog(parent_widget)
+                dialog.set_conversion_results(result_data)
+
+                # 连接信号处理
+                dialog.action_requested.connect(self.handle_stats_action)
+
+                # 显示弹窗
+                dialog.exec()
+
+        except Exception as e:
+            print(f"显示转换统计弹窗时出错: {e}")
+            # 如果统计弹窗出错，使用简单的消息框代替
+            from PyQt6.QtWidgets import QMessageBox
+            success_count = result_data.get('success_count', 0)
+            total_size_before = result_data.get('total_size_before', 0)
+            total_size_after = result_data.get('total_size_after', 0)
+            format_name = result_data.get('format', 'AVIF')
+
+            if total_size_before > 0 and total_size_after > 0:
+                space_saved = total_size_before - total_size_after
+                space_mb = space_saved / (1024 * 1024)
+                compression_ratio = (space_saved / total_size_before * 100) if total_size_before > 0 else 0
+                message = f"成功转换了{success_count}张图片为{format_name}格式，\n压缩了{space_mb:.1f}MB空间（{compression_ratio:.1f}%），\n图片更轻巧了！"
+            else:
+                message = f"成功转换了{success_count}张图片为{format_name}格式。\n图片格式优化完成！"
+
+            # 使用统一样式的消息框
+            from app.utils.ui_helpers import UIHelpers
+            UIHelpers.show_styled_message(None, "转换完成", message, "success", ["OK"])
+
+    def handle_stats_action(self, action):
+        """处理统计弹窗的动作请求"""
+        if action == "view_details":
+            # 查看详情 - 可以显示更详细的转换日志
+            pass
+        elif action == "primary_action":
+            # 主要操作 - 可以根据需要实现
+            pass
+        elif action == "delete_originals":
+            # 删除原图
+            self.delete_original_files()
+
+    def delete_original_files(self):
+        """删除原图文件（移动到回收站）"""
+        try:
+            # 获取最后一次转换的结果数据
+            from app.utils.ui_helpers import UIHelpers
+
+            if not hasattr(self, '_last_result_data') or not self._last_result_data:
+                UIHelpers.show_styled_message(
+                    None,
+                    "无法删除",
+                    "没有找到需要删除的原图文件。",
+                    "warning",
+                    ["OK"]
+                )
+                return
+
+            original_files = self._last_result_data.get('original_files', [])
+            if not original_files:
+                UIHelpers.show_styled_message(
+                    None,
+                    "无法删除",
+                    "没有找到需要删除的原图文件。",
+                    "warning",
+                    ["OK"]
+                )
+                return
+
+            # 导入 send2trash 库（用于移动文件到回收站）
+            try:
+                from send2trash import send2trash
+            except ImportError:
+                UIHelpers.show_styled_message(
+                    None,
+                    "缺少依赖",
+                    "缺少 send2trash 库，无法将文件移动到回收站。\n\n请运行: pip install send2trash",
+                    "error",
+                    ["OK"]
+                )
+                return
+
+            # 移动文件到回收站
+            deleted_count = 0
+            failed_files = []
+
+            for file_path in original_files:
+                try:
+                    # 规范化路径，移除 Windows 长路径前缀 \\?\
+                    normalized_path = file_path
+                    if normalized_path.startswith('\\\\?\\'):
+                        normalized_path = normalized_path[4:]
+
+                    # 转换为绝对路径并规范化
+                    normalized_path = os.path.abspath(os.path.normpath(normalized_path))
+
+                    if os.path.exists(normalized_path):
+                        send2trash(normalized_path)
+                        deleted_count += 1
+                        self.log_message.emit(f"已删除: {os.path.basename(normalized_path)}", "info")
+                    else:
+                        failed_files.append(os.path.basename(file_path))
+                        self.log_message.emit(f"删除失败 {os.path.basename(file_path)}: 文件不存在", "error")
+                except Exception as e:
+                    failed_files.append(os.path.basename(file_path))
+                    self.log_message.emit(f"删除失败 {os.path.basename(file_path)}: {str(e)}", "error")
+
+            # 显示结果
+            if deleted_count > 0:
+                if failed_files:
+                    message = f"成功删除 {deleted_count} 个原图文件。\n\n以下文件删除失败:\n" + "\n".join(failed_files[:5])
+                    if len(failed_files) > 5:
+                        message += f"\n... 还有 {len(failed_files) - 5} 个文件"
+                    UIHelpers.show_styled_message(
+                        None,
+                        "部分删除成功",
+                        message,
+                        "warning",
+                        ["OK"]
+                    )
+                else:
+                    UIHelpers.show_styled_message(
+                        None,
+                        "删除成功",
+                        f"成功将 {deleted_count} 个原图文件移动到回收站！",
+                        "success",
+                        ["OK"]
+                    )
+            else:
+                UIHelpers.show_styled_message(
+                    None,
+                    "删除失败",
+                    "没有成功删除任何文件。",
+                    "warning",
+                    ["OK"]
+                )
+
+        except Exception as e:
+            UIHelpers.show_styled_message(
+                None,
+                "错误",
+                f"删除原图时出错: {str(e)}",
+                "error",
+                ["OK"]
+            )
