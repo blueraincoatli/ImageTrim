@@ -46,7 +46,9 @@
 | Linux | `ImageTrim-Linux` | ~71MB | Linux可执行文件 |
 | Linux | `ImageTrim-Linux-AppImage.AppImage` | ~71MB | Linux便携版 |
 
-[点击这里下载最新版本](https://github.com/blueraincoatli/ImageTrim/releases/tag/v1.2.5)
+**[📦 点击这里下载最新版本](https://github.com/blueraincoatli/ImageTrim/releases/latest)**
+
+> 💡 提示：点击上方链接将自动跳转到最新版本的下载页面
 
 ## 🚀 快速开始
 
@@ -71,6 +73,15 @@ chmod +x ImageTrim-Linux-AppImage.AppImage
 
 ## 📖 使用指南
 
+### 🎬 快速演示
+
+#### 启动程序
+![启动程序演示](ImagTrimIntro/start_cut.avif)
+
+*程序启动和主界面展示*
+
+---
+
 ### 图片去重使用方法
 
 1. **添加扫描路径**
@@ -89,6 +100,22 @@ chmod +x ImageTrim-Linux-AppImage.AppImage
    - 查看找到的重复图片组
    - 选择保留或删除重复文件
 
+#### 📺 去重功能演示
+
+**演示 1：基本去重操作**
+
+![去重演示1](ImagTrimIntro/result01.avif)
+
+*展示如何扫描和识别重复图片*
+
+**演示 2：批量处理重复文件**
+
+![去重演示2](ImagTrimIntro/result02.avif)
+
+*展示如何处理和删除重复图片*
+
+---
+
 ### 格式转换使用方法
 
 1. **设置路径**
@@ -103,6 +130,12 @@ chmod +x ImageTrim-Linux-AppImage.AppImage
 3. **开始转换**
    - 点击"开始转换"按钮
    - 监控转换进度
+
+#### 📺 格式转换演示
+
+![转换为AVIF格式演示](ImagTrimIntro/toAvif.avif)
+
+*展示如何将图片批量转换为AVIF格式*
 
 ## 💡 使用技巧
 
